@@ -56,7 +56,7 @@ npm install
 
 
 
-🔐 Bước 2: Setup Biến môi trường (.env)
+#🔐 Bước 2: Setup Biến môi trường (.env)
 
 ⚠️ Tuyệt đối KHÔNG push file .env lên GitHub
 
@@ -79,7 +79,7 @@ cd frontend
 
 # Sau đó điền API URL
 VITE_API_URL=
-🗄️ Bước 3: Khởi chạy Database (PostgreSQL)
+#🗄️ Bước 3: Khởi chạy Database (PostgreSQL)
 
 Yêu cầu máy phải có Docker.
 
@@ -89,7 +89,7 @@ docker-compose up -d
 
 Lệnh này sẽ dựng container PostgreSQL cho dự án.
 
-🚀 Bước 4: Khởi chạy Server Web (Frontend + Backend)
+#🚀 Bước 4: Khởi chạy Server Web (Frontend + Backend)
 
 Không cần mở 2 terminal.
 
