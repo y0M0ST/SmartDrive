@@ -5,6 +5,8 @@ import time
 import os
 import sqlite3
 import uuid
+import requests
+import threading
 from datetime import datetime
 from tensorflow.keras.models import load_model
 
@@ -15,6 +17,21 @@ ALERTS_FOLDER = os.path.join(CURRENT_DIR, 'captured_alerts')
 
 # Đảm bảo thư mục lưu ảnh vi phạm tồn tại
 os.makedirs(ALERTS_FOLDER, exist_ok=True)
+
+# API ENDPOINT CỦA BACKEND
+BACKEND_URL = "http://localhost:3000/api/alerts"
+
+def send_alert_to_backend(violation_type, score):
+    payload = {
+        "driver_id": 1, 
+        "status": "Drowsy" if violation_type == "ngu_guc" else "Warning",
+        "timestamp": datetime.now().isoformat()
+    }
+    try:
+        response = requests.post(BACKEND_URL, json=payload, timeout=2) 
+        print(f"Đã báo cho Backend! Code: {response.status_code}")
+    except Exception as e:
+        print(f"Lỗi gửi API qua Backend (có thể server Node chưa mở): {e}")
 
 def log_violation_to_db(violation_type, confidence_score, frame):
     """Lưu khung hình lỗi và chèn log vô SQLite với UUID"""
@@ -130,7 +147,7 @@ def run_smartdrive_webcam():
                     cv2.rectangle(frame, (left_box[0], left_box[1]), (left_box[2], left_box[3]), color, 2)
                     cv2.rectangle(frame, (right_box[0], right_box[1]), (right_box[2], right_box[3]), color, 2)
                     
-                    cv2.putText(frame, f"Trang thai: {state} ({confidence_score:.2f})", (20, 40), 
+                    cv2.putText(frame, f"Trang thai: {state} (AI Score: {avg_pred:.2f})", (20, 40), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
                     
                     if closed_counter >= ALARM_FRAMES:
@@ -139,8 +156,12 @@ def run_smartdrive_webcam():
                         
                         current_time = time.time()
                         if current_time - last_alert_time > COOLDOWN_SECONDS:
-                            # Truyền nguyên cái frame đỏ chót vô lưu làm bằng chứng
+                            # 1. Lưu DB + Lưu ảnh vô ổ cứng
                             log_violation_to_db("ngu_guc", confidence_score, frame)
+                            
+                            # 2. Xài luồng phụ (Thread) để bắn API qua Backend (Bắc buộc dùng Thread để Camera ko bị giật tung xóa chờ mạng)
+                            threading.Thread(target=send_alert_to_backend, args=("ngu_guc", confidence_score)).start()
+                            
                             last_alert_time = current_time
 
         cv2.imshow('SmartDrive - CNN Realtime Test', frame)
