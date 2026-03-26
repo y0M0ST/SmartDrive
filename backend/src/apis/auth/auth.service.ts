@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../../config/database';
+import { addToBlacklist } from '../../common/utils/tokenBlacklist';
 
 export const loginService = async (email: string, password: string) => {
 
@@ -40,4 +41,8 @@ export const loginService = async (email: string, password: string) => {
       }
     }
   };
+};
+
+export const logoutService = (token: string): void => {
+  addToBlacklist(token);
 };
