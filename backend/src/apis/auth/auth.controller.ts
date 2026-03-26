@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { changePasswordService, forgotPasswordService, loginService , logoutService } from './auth.service';
+import { changePasswordService, forgotPasswordService, loginService , logoutService, resetPasswordService } from './auth.service';
 import { ApiResponse } from '../../common/types/response';
 import { AuthRequest } from '../../common/middlewares/auth.middleware';
 
@@ -122,6 +122,57 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
   } catch (err) {
     console.error('[Auth] Forgot password error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi hệ thống, vui lòng thử lại sau',
+      error: 'INTERNAL_ERROR'
+    } as ApiResponse);
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, otp, new_password } = req.body;
+    const result = await resetPasswordService(email, otp, new_password);
+
+    switch (result.code) {
+      case 'EMAIL_NOT_FOUND':
+        return res.status(404).json({
+          success: false,
+          message: 'Email không tồn tại trong hệ thống',
+          error: 'EMAIL_NOT_FOUND'
+        } as ApiResponse);
+
+      case 'OTP_NOT_FOUND':
+        return res.status(400).json({
+          success: false,
+          message: 'Chưa có yêu cầu đặt lại mật khẩu cho email này',
+          error: 'OTP_NOT_FOUND'
+        } as ApiResponse);
+
+      case 'INVALID_OTP':
+        return res.status(400).json({
+          success: false,
+          message: 'Mã OTP không chính xác',
+          error: 'INVALID_OTP'
+        } as ApiResponse);
+
+      case 'OTP_EXPIRED':
+        return res.status(400).json({
+          success: false,
+          message: 'Mã OTP đã hết hạn, vui lòng yêu cầu gửi lại',
+          error: 'OTP_EXPIRED'
+        } as ApiResponse);
+
+      default:
+        return res.status(200).json({
+          success: true,
+          message: 'Đặt lại mật khẩu thành công, vui lòng đăng nhập lại'
+        } as ApiResponse);
+    }
+
+  } catch (err) {
+    console.error('[Auth] Reset password error:', err);
     return res.status(500).json({
       success: false,
       message: 'Lỗi hệ thống, vui lòng thử lại sau',

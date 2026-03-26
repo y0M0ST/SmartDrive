@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { login, logout, changePassword, forgotPassword } from './auth.controller';
-import { validateLogin, validateChangePassword, validateForgotPassword } from './auth.validator';
+import { login, logout, changePassword, forgotPassword, resetPassword } from './auth.controller';
+import { validateLogin, validateChangePassword, validateForgotPassword, validateResetPassword } from './auth.validator';
 import { authenticate } from '../../common/middlewares/auth.middleware';
-
 
 const router = Router();
 
@@ -113,5 +112,41 @@ router.put('/change-password', authenticate, validateChangePassword, changePassw
  *         description: Email not found
  */
 router.post('/forgot-password', validateForgotPassword, forgotPassword);
+
+/**
+ * @swagger
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Reset password with OTP
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, otp, new_password, confirm_password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: admin@smartdrive.vn
+ *               otp:
+ *                 type: string
+ *                 example: "662788"
+ *               new_password:
+ *                 type: string
+ *                 example: Admin@789
+ *               confirm_password:
+ *                 type: string
+ *                 example: Admin@789
+ *     responses:
+ *       200:
+ *         description: Reset password success
+ *       400:
+ *         description: Invalid OTP or expired
+ *       404:
+ *         description: Email not found
+ */
+router.post('/reset-password', validateResetPassword, resetPassword);
 
 export default router;
