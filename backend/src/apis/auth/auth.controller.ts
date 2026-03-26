@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { loginService } from './auth.service';
+import { loginService , logoutService } from './auth.service';
 import { ApiResponse } from '../../common/types/response';
+import { AuthRequest } from '../../common/middlewares/auth.middleware';
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -32,6 +33,26 @@ export const login = async (req: Request, res: Response) => {
 
   } catch (err) {
     console.error('[Auth] Login error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi hệ thống, vui lòng thử lại sau',
+      error: 'INTERNAL_ERROR'
+    } as ApiResponse);
+  }
+};
+
+export const logout = (req: AuthRequest, res: Response) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] as string;
+    logoutService(token);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Dang xuat thanh cong'
+    } as ApiResponse);
+
+  } catch (err) {
+    console.error('[Auth] Logout error:', err);
     return res.status(500).json({
       success: false,
       message: 'Lỗi hệ thống, vui lòng thử lại sau',
