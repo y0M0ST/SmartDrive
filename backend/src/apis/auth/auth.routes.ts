@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { login , logout } from './auth.controller';
-import { validateLogin } from './auth.validator';
+import { login, logout, changePassword } from './auth.controller';
+import { validateLogin, validateChangePassword } from './auth.validator';
 import { authenticate } from '../../common/middlewares/auth.middleware';
 
 const router = Router();
@@ -52,5 +52,40 @@ router.post('/login', validateLogin, login);
  *         description: Unauthorized
  */
 router.post('/logout', authenticate, logout);
+
+/**
+ * @swagger
+ * /api/auth/change-password:
+ *   put:
+ *     summary: Change password
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [old_password, new_password, confirm_password]
+ *             properties:
+ *               old_password:
+ *                 type: string
+ *                 example: Admin@123
+ *               new_password:
+ *                 type: string
+ *                 example: Admin@456
+ *               confirm_password:
+ *                 type: string
+ *                 example: Admin@456
+ *     responses:
+ *       200:
+ *         description: Change password success
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Wrong old password
+ */
+router.put('/change-password', authenticate, validateChangePassword, changePassword);
 
 export default router;
