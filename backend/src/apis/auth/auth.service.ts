@@ -46,3 +46,28 @@ export const loginService = async (email: string, password: string) => {
 export const logoutService = (token: string): void => {
   addToBlacklist(token);
 };
+
+export const changePasswordService = async (adminId: string, oldPassword: string, newPassword: string) => {
+  // 1. Lấy thông tin admin
+  const result = await pool.query(
+    'SELECT * FROM admins WHERE id = $1',
+    [adminId]
+  );
+  const admin = result.rows[0];
+  if (!admin) return { code: 'NOT_FOUND' };
+
+  // 2. Kiểm tra mật khẩu cũ
+  const isValid = await bcrypt.compare(oldPassword, admin.password_hash);
+  if (!isValid) return { code: 'WRONG_OLD_PASSWORD' };
+
+  // 3. Hash mật khẩu mới
+  const newHash = await bcrypt.hash(newPassword, 12);
+
+  // 4. Cập nhật vào DB
+  await pool.query(
+    'UPDATE admins SET password_hash = $1 WHERE id = $2',
+    [newHash, adminId]
+  );
+
+  return { code: 'SUCCESS' };
+};
