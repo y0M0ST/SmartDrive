@@ -1,0 +1,5 @@
+name: SmartDrive Dev
+values:
+  - key: token
+    value: ''
+    enabled: true
