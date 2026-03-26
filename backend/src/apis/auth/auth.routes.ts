@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { login } from './auth.controller';
+import { login , logout } from './auth.controller';
 import { validateLogin } from './auth.validator';
+import { authenticate } from '../../common/middlewares/auth.middleware';
 
 const router = Router();
 
@@ -35,5 +36,21 @@ const router = Router();
  *         description: Account disabled
  */
 router.post('/login', validateLogin, login);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout success
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/logout', authenticate, logout);
 
 export default router;
