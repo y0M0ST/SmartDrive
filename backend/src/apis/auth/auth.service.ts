@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../../config/database';
 import { addToBlacklist } from '../../common/utils/tokenBlacklist';
+import { sendMail } from '../../config/mailer';
 
 export const loginService = async (email: string, password: string) => {
 
@@ -67,6 +68,58 @@ export const changePasswordService = async (adminId: string, oldPassword: string
   await pool.query(
     'UPDATE admins SET password_hash = $1 WHERE id = $2',
     [newHash, adminId]
+  );
+
+  return { code: 'SUCCESS' };
+};
+
+export const forgotPasswordService = async (email: string) => {
+  // 1. Kiểm tra email tồn tại
+  const result = await pool.query(
+    'SELECT * FROM admins WHERE email = $1',
+    [email.toLowerCase().trim()]
+  );
+  const admin = result.rows[0];
+  if (!admin) return { code: 'EMAIL_NOT_FOUND' };
+
+  // 2. Tạo OTP 6 số
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // 3. Lưu OTP vào DB, hết hạn sau 15 phút
+  const expires = new Date(Date.now() + 15 * 60 * 1000);
+  await pool.query(
+    `UPDATE admins
+     SET password_reset_token = $1, password_reset_expires = $2
+     WHERE id = $3`,
+    [otp, expires, admin.id]
+  );
+
+  // 4. Gửi email
+  await sendMail(
+    email,
+    'SmartDrive - Mã OTP đặt lại mật khẩu',
+    `
+    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+      <h2 style="color: #1B3A6B;">SmartDrive</h2>
+      <p>Xin chào <strong>${admin.full_name}</strong>,</p>
+      <p>Mã OTP đặt lại mật khẩu của bạn là:</p>
+      <div style="
+        background: #f0f4f8;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        margin: 20px 0;
+      ">
+        <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1B3A6B;">
+          ${otp}
+        </span>
+      </div>
+      <p style="color: #e53e3e;">Mã OTP có hiệu lực trong <strong>15 phút</strong>.</p>
+      <p>ếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
+      <hr/>
+      <p style="color: #888; font-size: 12px;">SmartDrive - Hệ thống giám sát xe khách</p>
+    </div>
+    `
   );
 
   return { code: 'SUCCESS' };

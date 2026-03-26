@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { login, logout, changePassword } from './auth.controller';
-import { validateLogin, validateChangePassword } from './auth.validator';
+import { login, logout, changePassword, forgotPassword } from './auth.controller';
+import { validateLogin, validateChangePassword, validateForgotPassword } from './auth.validator';
 import { authenticate } from '../../common/middlewares/auth.middleware';
+
 
 const router = Router();
 
@@ -87,5 +88,30 @@ router.post('/logout', authenticate, logout);
  *         description: Wrong old password
  */
 router.put('/change-password', authenticate, validateChangePassword, changePassword);
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Forgot password - Send OTP to email
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: admin@smartdrive.vn
+ *     responses:
+ *       200:
+ *         description: OTP sent to email
+ *       404:
+ *         description: Email not found
+ */
+router.post('/forgot-password', validateForgotPassword, forgotPassword);
 
 export default router;

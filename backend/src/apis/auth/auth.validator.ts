@@ -61,3 +61,26 @@ export const validateChangePassword = (req: Request, res: Response, next: NextFu
 
   next();
 };
+
+export const validateForgotPassword = (req: Request,res: Response,next: NextFunction) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: 'Vui lòng nhập email',
+      error: 'MISSING_FIELDS'
+    } as ApiResponse);
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email không đúng định dạng',
+      error: 'INVALID_EMAIL'
+    } as ApiResponse);
+  }
+
+  next();
+};

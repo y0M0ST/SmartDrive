@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { changePasswordService, loginService , logoutService } from './auth.service';
+import { changePasswordService, forgotPasswordService, loginService , logoutService } from './auth.service';
 import { ApiResponse } from '../../common/types/response';
 import { AuthRequest } from '../../common/middlewares/auth.middleware';
 
@@ -72,21 +72,21 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
       case 'NOT_FOUND':
         return res.status(404).json({
           success: false,
-          message: 'Tai khoan khong ton tai',
+          message: 'Tài khoản không tồn tại',
           error: 'NOT_FOUND'
         } as ApiResponse);
 
       case 'WRONG_OLD_PASSWORD':
         return res.status(401).json({
           success: false,
-          message: 'Mat khau hien tai khong chinh xac',
+          message: 'Mật khẩu hiện tại không chính xác',
           error: 'WRONG_OLD_PASSWORD'
         } as ApiResponse);
 
       default:
         return res.status(200).json({
           success: true,
-          message: 'Doi mat khau thanh cong'
+          message: 'Đổi mật khẩu thành công'
         } as ApiResponse);
     }
 
@@ -94,7 +94,37 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
     console.error('[Auth] Change password error:', err);
     return res.status(500).json({
       success: false,
-      message: 'Loi he thong, vui long thu lai sau',
+      message: 'Lỗi hệ thống, vui lòng thử lại sau',
+      error: 'INTERNAL_ERROR'
+    } as ApiResponse);
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const result = await forgotPasswordService(email);
+
+    switch (result.code) {
+      case 'EMAIL_NOT_FOUND':
+        return res.status(404).json({
+          success: false,
+          message: 'Email này không tồn tại trong hệ thống',
+          error: 'EMAIL_NOT_FOUND'
+        } as ApiResponse);
+
+      default:
+        return res.status(200).json({
+          success: true,
+          message: 'Mã OTP đã được gửi về email của bạn, có hiệu lực 15 phút'
+        } as ApiResponse);
+    }
+
+  } catch (err) {
+    console.error('[Auth] Forgot password error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi hệ thống, vui lòng thử lại sau',
       error: 'INTERNAL_ERROR'
     } as ApiResponse);
   }
