@@ -5,7 +5,12 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import swaggerUi from 'swagger-ui-express';
 import './config/database';
+
+import authRoutes from './apis/auth/auth.routes';
+
+import { swaggerSpec } from './config/swagger';
 
 dotenv.config();
 
@@ -23,6 +28,12 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Routes
+app.use('/api/auth', authRoutes);
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({
@@ -34,14 +45,14 @@ app.get('/health', (req, res) => {
 
 // Socket.io
 io.on('connection', (socket) => {
-  console.log(`🔌 Client kết nối: ${socket.id}`);
+  console.log(`Client kết nối: ${socket.id}`);
   socket.on('disconnect', () => {
-    console.log(`🔌 Client ngắt kết nối: ${socket.id}`);
+    console.log(`Client ngắt kết nối: ${socket.id}`);
   });
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`🚀 SmartDrive Backend đang chạy tại http://localhost:${PORT}`);
+  console.log(`SmartDrive Backend đang chạy tại http://localhost:${PORT}`);
 });
 
 export { io };
