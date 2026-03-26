@@ -124,3 +124,48 @@ export const forgotPasswordService = async (email: string) => {
 
   return { code: 'SUCCESS' };
 };
+
+export const resetPasswordService = async (
+  email:       string,
+  otp:         string,
+  newPassword: string
+) => {
+  // 1. Tìm admin theo email
+  const result = await pool.query(
+    'SELECT * FROM admins WHERE email = $1',
+    [email.toLowerCase().trim()]
+  );
+  const admin = result.rows[0];
+  if (!admin) return { code: 'EMAIL_NOT_FOUND' };
+
+  // 2. Kiểm tra OTP có tồn tại không
+  if (!admin.password_reset_token) {
+    return { code: 'OTP_NOT_FOUND' };
+  }
+
+  // 3. Kiểm tra OTP có đúng không
+  if (admin.password_reset_token !== otp) {
+    return { code: 'INVALID_OTP' };
+  }
+
+  // 4. Kiểm tra OTP có hết hạn không
+  const now = new Date();
+  if (new Date(admin.password_reset_expires) < now) {
+    return { code: 'OTP_EXPIRED' };
+  }
+
+  // 5. Hash mật khẩu mới
+  const newHash = await bcrypt.hash(newPassword, 12);
+
+  // 6. Cập nhật mật khẩu + xóa OTP
+  await pool.query(
+    `UPDATE admins SET
+      password_hash          = $1,
+      password_reset_token   = NULL,
+      password_reset_expires = NULL
+     WHERE id = $2`,
+    [newHash, admin.id]
+  );
+
+  return { code: 'SUCCESS' };
+};
