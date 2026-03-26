@@ -8,8 +8,8 @@
     "dev": "nodemon --exec ts-node src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "migrate": "ts-node src/migrations/run.ts",
-    "seed": "ts-node src/seeders/seed.ts"
+    "migrate": "ts-node src/scripts/run-migration.ts",
+    "seed": "ts-node src/scripts/run-seeder.ts"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +24,8 @@
     "morgan": "^1.10.0",
     "pg": "^8.13.0",
     "socket.io": "^4.8.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^11.0.0"
   },
   "devDependencies": {
@@ -34,6 +36,8 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^25.4.0",
     "@types/pg": "^8.11.10",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.0",
     "ts-node": "^10.9.2",
