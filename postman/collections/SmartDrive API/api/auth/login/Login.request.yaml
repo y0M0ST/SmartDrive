@@ -1,0 +1,15 @@
+$kind: http-request
+name: Login
+url: "{{baseUrl}}/api/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "admin@smartdrive.vn",
+      "password": "Admin@12345"
+    }
+examples: ./.resources/Login.resources/examples
+order: 1000
