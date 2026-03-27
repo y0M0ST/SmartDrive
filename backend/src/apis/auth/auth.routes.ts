@@ -11,6 +11,8 @@ const router = Router();
  *   post:
  *     summary: Login
  *     tags: [Auth]
+ *     x-displayName: Login
+ *     description: ""
  *     requestBody:
  *       required: true
  *       content:
