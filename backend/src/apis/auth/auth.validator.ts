@@ -1,6 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiResponse } from '../../common/types/response';
 
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+const validatePasswordStrength = (
+  password: string,
+  res: Response
+): boolean => {
+  if (!passwordRegex.test(password)) {
+    res.status(400).json({
+      success: false,
+      message: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&)',
+      error: 'WEAK_PASSWORD'
+    } as ApiResponse);
+    return false;
+  }
+  return true;
+};
+
 export const validateLogin = (req: Request, res: Response, next: NextFunction) => {
   const { email, password } = req.body;
 
@@ -35,13 +52,7 @@ export const validateChangePassword = (req: Request, res: Response, next: NextFu
     } as ApiResponse);
   }
 
-  if (new_password.length < 6) {
-    return res.status(400).json({
-      success: false,
-      message: 'Mật khẩu phải có ít nhất 6 ký tự',
-      error: 'PASSWORD_TOO_SHORT'
-    } as ApiResponse);
-  }
+  if (!validatePasswordStrength(new_password, res)) return;
 
   if (new_password !== confirm_password) {
     return res.status(400).json({
@@ -108,13 +119,7 @@ export const validateResetPassword = (
     } as ApiResponse);
   }
 
-  if (new_password.length < 6) {
-    return res.status(400).json({
-      success: false,
-      message: 'Mật khẩu phải có ít nhất 6 ký tự',
-      error: 'PASSWORD_TOO_SHORT'
-    } as ApiResponse);
-  }
+  if (!validatePasswordStrength(new_password, res)) return;
 
   if (new_password !== confirm_password) {
     return res.status(400).json({

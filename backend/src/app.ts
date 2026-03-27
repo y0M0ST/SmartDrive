@@ -29,7 +29,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: `
+    .opblock-summary-path {
+      display: none !important;
+    }
+  `
+}));
 
 // Expose Swagger JSON cho Postman import
 app.get('/swagger.json', (req, res) => {
