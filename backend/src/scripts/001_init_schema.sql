@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS admins (
   full_name     VARCHAR(150)  NOT NULL,
   role          VARCHAR(30)   NOT NULL DEFAULT 'dispatcher',
   is_active     BOOLEAN       NOT NULL DEFAULT TRUE,
+  password_reset_token   VARCHAR(255),
+  password_reset_expires TIMESTAMPTZ,
   created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_admins_email UNIQUE (email),
