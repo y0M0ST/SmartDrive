@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: smartdrive_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smartdrive_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Phuc1409
+    ports:
+      - "5432:5432"
+    volumes:
+      - smartdrive_pgdata:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: smartdrive_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@smartdrive.vn
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  smartdrive_pgdata:
