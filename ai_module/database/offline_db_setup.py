@@ -11,7 +11,7 @@ def get_db_path():
     return os.path.join(db_folder, 'local_database.sqlite')
 
 def init_db():
-    print("⏳ Đang khởi tạo bộ khung Database Offline (Bản xài UUID siêu cấp)...")
+    print("Đang khởi tạo bộ khung Database Offline")
     db_path = get_db_path()
     
     try:
@@ -64,10 +64,10 @@ def init_db():
         conn.commit()
         conn.close()
         
-        print(f"✅ BÙM! Khởi tạo thành công tại:\n👉 {db_path}")
+        print(f"BÙM! Khởi tạo thành công tại:\n {db_path}")
         
     except Exception as e:
-        print(f"❌ Lỗi trong quá trình khởi tạo DB: {e}")
+        print(f"Lỗi trong quá trình khởi tạo DB: {e}")
 
 if __name__ == "__main__":
     init_db()

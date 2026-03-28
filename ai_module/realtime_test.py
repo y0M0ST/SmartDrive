@@ -29,8 +29,10 @@ def send_alert_to_backend(violation_type, score):
     }
     try:
         response = requests.post(BACKEND_URL, json=payload, timeout=2) 
+        print("#################")
         print(f"Đã báo cho Backend! Code: {response.status_code}")
     except Exception as e:
+        print("============")
         print(f"Lỗi gửi API qua Backend (có thể server Node chưa mở): {e}")
 
 def log_violation_to_db(violation_type, confidence_score, frame):
@@ -58,15 +60,15 @@ def log_violation_to_db(violation_type, confidence_score, frame):
         ''', (alert_id, db_time, violation_type, confidence_score, db_image_path, 0, 0))
         conn.commit()
         conn.close()
-        print(f"📸 Đã chộp '{violation_type}' (ID: {alert_id[:8]}... | Tự tin: {confidence_score:.2f})")
+        print(f"Đã chụp '{violation_type}' (ID: {alert_id[:8]}... | Tự tin: {confidence_score:.2f})")
     except Exception as e:
-        print(f"❌ Lỗi ghi DB: {e}")
+        print(f"Lỗi ghi DB: {e}")
 
-print("🧠 Đang nạp não bộ AI 100% công lực... Đợi xíu nha!")
+print(" Đang nạp não bộ AI 100% công lực... Đợi xíu nha!")
 # Load model từ thư mục 'model' nằm trong 'ai_module'
 model_path = os.path.join(CURRENT_DIR, 'models', 'smartdrive_eye_model.h5')
 model = load_model(model_path, compile=False)
-print("✅ Nạp não thành công! Lên hình!!!")
+print("Nạp não thành công! Lên hình!!!")
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(max_num_faces=1, refine_landmarks=True)
