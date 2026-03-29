@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS drivers (
   updated_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_drivers_phone   UNIQUE (phone),
   CONSTRAINT uq_drivers_license UNIQUE (license_number),
-  CONSTRAINT chk_drivers_status CHECK (status IN ('active','on_trip','off','banned')),
+  CONSTRAINT chk_drivers_status CHECK (status IN ('active','on_trip','banned')),
   CONSTRAINT chk_drivers_score  CHECK (safety_score >= 0 AND safety_score <= 100)
 );
 
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   created_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_vehicles_plate   UNIQUE (license_plate),
-  CONSTRAINT chk_vehicles_status CHECK (status IN ('available','on_trip','maintenance','retired')),
+  CONSTRAINT chk_vehicles_status CHECK (status IN ('available','on_trip','maintenance')),
   CONSTRAINT chk_vehicles_seats  CHECK (seat_count > 0)
 );
 

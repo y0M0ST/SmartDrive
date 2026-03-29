@@ -3,13 +3,30 @@ import path from 'path';
 import pool from '../config/database';
 
 async function runMigration() {
-  const sqlPath = path.join(__dirname, '001_init_schema.sql');
+  const finalSchemaFile = 'final_complete_schema.sql';
+  const sqlPath = path.join(__dirname, finalSchemaFile);
+  const shouldReset = process.argv.includes('--reset') || process.env.RESET_DB === 'true';
+
+  if (!fs.existsSync(sqlPath)) {
+    throw new Error(`Khong tim thay file schema tong hop: ${finalSchemaFile}`);
+  }
+
   const sql = fs.readFileSync(sqlPath, 'utf8');
 
   try {
-    console.log('Dang chay migration...');
+    if (shouldReset) {
+      console.log('Dang reset lai schema public...');
+      await pool.query(`
+        DROP SCHEMA IF EXISTS public CASCADE;
+        CREATE SCHEMA public;
+        GRANT ALL ON SCHEMA public TO CURRENT_USER;
+        GRANT ALL ON SCHEMA public TO public;
+      `);
+    }
+
+    console.log(`Dang ap dung ${finalSchemaFile}...`);
     await pool.query(sql);
-    console.log('Migration hoan thanh — 13 bang da duoc tao');
+    console.log(`Migration hoan thanh — da ap dung schema tong hop ${finalSchemaFile}`);
   } catch (err) {
     console.error('Migration that bai:', err);
   } finally {

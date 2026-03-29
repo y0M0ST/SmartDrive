@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { login, logout, changePassword, forgotPassword, resetPassword } from './auth.controller';
-import { validateLogin, validateChangePassword, validateForgotPassword, validateResetPassword } from './auth.validator';
+import { driverLogin, login, logout, changePassword, forgotPassword, resetPassword } from './auth.controller';
+import { validateLogin, validateDriverLogin, validateChangePassword, validateForgotPassword, validateResetPassword } from './auth.validator';
 import { authenticate } from '../../common/middlewares/auth.middleware';
 
 const router = Router();
@@ -38,6 +38,32 @@ const router = Router();
  *         description: Account disabled
  */
 router.post('/login', validateLogin, login);
+
+/**
+ * @swagger
+ * /api/auth/driver-login:
+ *   post:
+ *     summary: Driver login
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: driver.nguyenvanan@smartdrive.vn
+ *               password:
+ *                 type: string
+ *                 example: Driver@123
+ *     responses:
+ *       200:
+ *         description: Driver login success
+ */
+router.post('/driver-login', validateDriverLogin, driverLogin);
 
 /**
  * @swagger
