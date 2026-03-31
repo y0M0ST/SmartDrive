@@ -3,7 +3,7 @@
 -- SECTION A. Current operational core (US 5-6)
 -- 1. super_admin is the highest account, seeded by the project team, and is not created from UI.
 -- 2. agency_manager accounts are created by super_admin and are bound to exactly one agency.
--- 3. agencies, drivers, and vehicles use direct delete; there is no hide/restore flow.
+-- 3. agencies can be marked inactive at the data layer; drivers and vehicles still use direct delete and there is no hide/restore flow for them.
 --
 -- SECTION B. Future account/payroll extension
 -- 4. driver accounts are created by agency_manager; there is no public signup flow for drivers.
@@ -18,12 +18,12 @@ CREATE TABLE IF NOT EXISTS agencies (
   name          VARCHAR(150) NOT NULL,
   address       VARCHAR(255),
   contact_phone VARCHAR(20),
-  status        VARCHAR(20)  NOT NULL DEFAULT 'active',
+  status        VARCHAR(20)  NOT NULL DEFAULT 'active','inactive'
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_agencies_code UNIQUE (code),
   CONSTRAINT uq_agencies_name UNIQUE (name),
-  CONSTRAINT chk_agencies_status CHECK (status IN ('active'))
+  CONSTRAINT chk_agencies_status CHECK (status IN ('active','inactive'))
 );
 
 CREATE TABLE IF NOT EXISTS admins (
@@ -357,6 +357,13 @@ CREATE TABLE IF NOT EXISTS sync_logs (
   CONSTRAINT chk_sl_status CHECK (status IN ('pending','success','failed','retrying')),
   CONSTRAINT chk_sl_retry CHECK (retry_count >= 0)
 );
+
+ALTER TABLE agencies DROP CONSTRAINT IF EXISTS chk_agencies_status;
+ALTER TABLE agencies
+  ADD CONSTRAINT chk_agencies_status CHECK (status IN ('active','inactive'));
+
+ALTER TABLE violation_logs
+  ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
 CREATE INDEX IF NOT EXISTS idx_admins_agency_id ON admins (agency_id);
 CREATE INDEX IF NOT EXISTS idx_drivers_agency_id ON drivers (agency_id);
