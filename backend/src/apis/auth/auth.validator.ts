@@ -41,29 +41,6 @@ export const validateLogin = (req: Request, res: Response, next: NextFunction) =
   next();
 };
 
-export const validateDriverLogin = (req: Request, res: Response, next: NextFunction) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Vui long nhap day du Email va Mat khau',
-      error: 'MISSING_FIELDS'
-    } as ApiResponse);
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email khong dung dinh dang',
-      error: 'INVALID_EMAIL'
-    } as ApiResponse);
-  }
-
-  next();
-};
-
 export const validateChangePassword = (req: Request, res: Response, next: NextFunction) => {
   const { old_password, new_password, confirm_password } = req.body;
 

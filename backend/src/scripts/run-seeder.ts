@@ -1,6 +1,11 @@
 import pool from '../config/database';
 import bcrypt from 'bcryptjs';
 
+const seedRoutes = [
+  { name: 'Da Nang - Ha Noi', origin: 'Da Nang', destination: 'Ha Noi', distanceKm: 780, estimatedDurationMin: 840 },
+  { name: 'Da Nang - TP.HCM', origin: 'Da Nang', destination: 'TP.HCM', distanceKm: 960, estimatedDurationMin: 1020 },
+];
+
 async function seed() {
   const client = await pool.connect();
   try {
@@ -99,13 +104,20 @@ async function seed() {
     }
     console.log('5 xe khach da duoc tao');
 
-    await client.query(`
-      INSERT INTO routes (name, origin, destination, distance_km, estimated_duration_min)
-      VALUES
-        (N'Da Nang - Ha Noi', N'Da Nang', N'Ha Noi', 780, 840),
-        (N'Da Nang - TP.HCM', N'Da Nang', N'TP.HCM', 960, 1020)
-      ON CONFLICT DO NOTHING`
-    );
+    for (const route of seedRoutes) {
+      await client.query(
+        `INSERT INTO routes (name, origin, destination, distance_km, estimated_duration_min)
+         SELECT $1::varchar(200), $2::varchar(100), $3::varchar(100), $4::double precision, $5::integer
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM routes
+           WHERE name = $1::varchar(200)
+             AND origin = $2::varchar(100)
+             AND destination = $3::varchar(100)
+         )`,
+        [route.name, route.origin, route.destination, route.distanceKm, route.estimatedDurationMin]
+      );
+    }
     console.log('2 tuyen duong mau da duoc tao');
 
     await client.query('COMMIT');

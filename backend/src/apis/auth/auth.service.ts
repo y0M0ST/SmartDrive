@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import pool from '../../config/database';
 import { addToBlacklist } from '../../common/utils/tokenBlacklist';
@@ -40,7 +41,10 @@ export const loginService = async (email: string, password: string) => {
       agency_name: admin.agency_name,
     },
     process.env.JWT_SECRET as string,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '12h' } as jwt.SignOptions
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || '12h',
+      jwtid: randomUUID(),
+    } as jwt.SignOptions
   );
 
   return {
@@ -56,73 +60,6 @@ export const loginService = async (email: string, password: string) => {
         agency_name: admin.agency_name,
       }
     }
-  };
-};
-
-export const driverLoginService = async (email: string, password: string) => {
-  const result = await pool.query(
-    `SELECT
-       da.id,
-       da.username AS email,
-       da.password_hash,
-       da.is_active,
-       da.must_change_password,
-       d.id AS driver_id,
-       d.full_name,
-       d.phone,
-       d.status AS driver_status,
-       d.agency_id,
-       ag.name AS agency_name,
-       ag.status AS agency_status
-     FROM driver_accounts da
-     INNER JOIN drivers d ON d.id = da.driver_id
-     INNER JOIN agencies ag ON ag.id = d.agency_id
-     WHERE da.username = $1`,
-    [email.trim().toLowerCase()]
-  );
-  const driverAccount = result.rows[0];
-
-  if (!driverAccount) return { code: 'INVALID_CREDENTIALS' };
-  if (!driverAccount.is_active) return { code: 'ACCOUNT_DISABLED' };
-  if (driverAccount.agency_status !== 'active') return { code: 'AGENCY_INACTIVE' };
-  if (driverAccount.driver_status === 'banned') return { code: 'DRIVER_BLOCKED' };
-
-  const isValid = await bcrypt.compare(password, driverAccount.password_hash);
-  if (!isValid) return { code: 'INVALID_CREDENTIALS' };
-
-  const token = jwt.sign(
-    {
-      id: driverAccount.id,
-      account_type: 'driver',
-      driver_id: driverAccount.driver_id,
-      email: driverAccount.email,
-      agency_id: driverAccount.agency_id,
-      agency_name: driverAccount.agency_name,
-    },
-    process.env.JWT_SECRET as string,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '12h' } as jwt.SignOptions
-  );
-
-  await pool.query(
-    'UPDATE driver_accounts SET last_login_at = NOW() WHERE id = $1',
-    [driverAccount.id]
-  );
-
-  return {
-    code: 'SUCCESS',
-    data: {
-      token,
-      driver: {
-        id: driverAccount.driver_id,
-        account_id: driverAccount.id,
-        email: driverAccount.email,
-        full_name: driverAccount.full_name,
-        phone: driverAccount.phone,
-        agency_id: driverAccount.agency_id,
-        agency_name: driverAccount.agency_name,
-        must_change_password: driverAccount.must_change_password,
-      },
-    },
   };
 };
 

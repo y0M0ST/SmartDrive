@@ -3,21 +3,23 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import swaggerUi from 'swagger-ui-express';
-import pool from './config/database';
 
 import authRoutes from './apis/auth/auth.routes';
 import agencyRoutes from './apis/agencies/agency.routes';
 import driverRoutes from './apis/drivers/driver.routes';
-import driverAccountRoutes from './apis/driver-accounts/driverAccount.routes';
 import vehicleRoutes from './apis/vehicles/vehicle.routes';
 
 import { swaggerSpec } from './config/swagger';
 import { loginService } from './apis/auth/auth.service';
 
-dotenv.config();
+dotenv.config({
+  path: path.resolve(__dirname, '../.env'),
+  override: true,
+});
 
 const app        = express();
 const httpServer = createServer(app);
@@ -33,21 +35,6 @@ type SwaggerCredential = {
 const swaggerSuperAdminCredential: SwaggerCredential = {
   email: process.env.SWAGGER_SUPER_ADMIN_EMAIL?.trim().toLowerCase() || 'admin@smartdrive.vn',
   password: process.env.SWAGGER_SUPER_ADMIN_PASSWORD || 'Admin@123',
-};
-
-const swaggerSeedPasswordsByEmail = new Map<string, string>([
-  ['danang@smartdrive.vn', process.env.SWAGGER_DANANG_MANAGER_PASSWORD || 'Danang@123'],
-  ['trungtam@smartdrive.vn', process.env.SWAGGER_TRUNGTAM_MANAGER_PASSWORD || 'Trungtam@123'],
-]);
-
-const getSwaggerPasswordForEmail = (email: string) => {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (normalizedEmail === swaggerSuperAdminCredential.email) {
-    return swaggerSuperAdminCredential.password;
-  }
-
-  return swaggerSeedPasswordsByEmail.get(normalizedEmail) || null;
 };
 
 const swaggerBaseSpec = swaggerSpec as any;
@@ -90,95 +77,6 @@ const getSwaggerToken = async (email: string, password: string) => {
 
   return result.data.token;
 };
-
-const getAgencyManagerCredentialsForDriver = async (driverId?: string) => {
-  if (!driverId) {
-    return null;
-  }
-
-  const result = await pool.query(
-    `SELECT adm.email
-     FROM drivers d
-     INNER JOIN admins adm
-       ON adm.agency_id = d.agency_id
-      AND adm.role = 'agency_manager'
-      AND adm.is_active = TRUE
-     WHERE d.id = $1
-     ORDER BY adm.created_at ASC
-     LIMIT 1`,
-    [driverId]
-  );
-
-  const managerEmail = result.rows[0]?.email;
-  if (!managerEmail) {
-    return null;
-  }
-
-  const password = getSwaggerPasswordForEmail(managerEmail);
-  if (!password) {
-    return null;
-  }
-
-  return {
-    email: managerEmail,
-    password,
-  };
-};
-
-const getAgencyManagerCredentialsForDriverAccount = async (accountId: string) => {
-  const result = await pool.query(
-    `SELECT adm.email
-     FROM driver_accounts da
-     INNER JOIN drivers d ON d.id = da.driver_id
-     INNER JOIN admins adm
-       ON adm.agency_id = d.agency_id
-      AND adm.role = 'agency_manager'
-      AND adm.is_active = TRUE
-     WHERE da.id = $1
-     ORDER BY adm.created_at ASC
-     LIMIT 1`,
-    [accountId]
-  );
-
-  const managerEmail = result.rows[0]?.email;
-  if (!managerEmail) {
-    return null;
-  }
-
-  const password = getSwaggerPasswordForEmail(managerEmail);
-  if (!password) {
-    return null;
-  }
-
-  return {
-    email: managerEmail,
-    password,
-  };
-};
-
-const getSwaggerCredentialsForRequest = async (req: express.Request, pathname: string) => {
-  const method = req.method.toUpperCase();
-
-  if (pathname === '/api/driver-accounts' && method === 'POST') {
-    const agencyManagerCredentials = await getAgencyManagerCredentialsForDriver(req.body?.driver_id);
-    if (agencyManagerCredentials) {
-      return agencyManagerCredentials;
-    }
-  }
-
-  if (/^\/api\/driver-accounts\/[^/]+(?:\/reset-password)?$/.test(pathname) && ['PUT', 'DELETE'].includes(method)) {
-    const accountId = pathname.split('/')[3];
-    const agencyManagerCredentials = await getAgencyManagerCredentialsForDriverAccount(accountId);
-    if (agencyManagerCredentials) {
-      return agencyManagerCredentials;
-    }
-  }
-
-  return {
-    email: swaggerSuperAdminCredential.email,
-    password: swaggerSuperAdminCredential.password,
-  };
-};
 // Middlewares
 app.use(helmet());
 app.use(cors());
@@ -199,8 +97,10 @@ app.use('/swagger-api', async (req, res) => {
 
     const isPublicAuthRoute = /^\/api\/auth\/(login|forgot-password|reset-password)$/.test(targetUrl.pathname);
     if (!isPublicAuthRoute) {
-      const credentials = await getSwaggerCredentialsForRequest(req, targetUrl.pathname);
-      const token = await getSwaggerToken(credentials.email, credentials.password);
+      const token = await getSwaggerToken(
+        swaggerSuperAdminCredential.email,
+        swaggerSuperAdminCredential.password
+      );
       headers.set('authorization', `Bearer ${token}`);
     }
 
@@ -259,7 +159,6 @@ app.get('/swagger.json', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/agencies', agencyRoutes);
 app.use('/api/drivers', driverRoutes);
-app.use('/api/driver-accounts', driverAccountRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 
 // Health check

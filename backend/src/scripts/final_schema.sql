@@ -1,31 +1,29 @@
--- Final consolidated SmartDrive schema
---
--- SECTION A. Current operational core (US 5-6)
--- 1. super_admin is the highest account, seeded by the project team, and is not created from UI.
--- 2. agency_manager accounts are created by super_admin and are bound to exactly one agency.
--- 3. agencies can be marked inactive at the data layer; drivers and vehicles still use direct delete and there is no hide/restore flow for them.
---
--- SECTION B. Future account/payroll extension
--- 4. driver accounts are created by agency_manager; there is no public signup flow for drivers.
--- 5. payroll should be based on driver salary contracts plus working/checkin/checkout logs.
--- 6. driver mobile features are tied to driver_accounts, driver_work_logs, trips, and violation data.
+-- ============================================================
+-- SmartDrive Database Schema - Final v3.0
+-- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- ============================================================
+-- 1. AGENCIES
+-- ============================================================
 CREATE TABLE IF NOT EXISTS agencies (
   id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   code          VARCHAR(60)  NOT NULL,
   name          VARCHAR(150) NOT NULL,
   address       VARCHAR(255),
   contact_phone VARCHAR(20),
-  status        VARCHAR(20)  NOT NULL DEFAULT 'active','inactive'
+  status        VARCHAR(20)  NOT NULL DEFAULT 'active',
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_agencies_code UNIQUE (code),
-  CONSTRAINT uq_agencies_name UNIQUE (name),
+  CONSTRAINT uq_agencies_code   UNIQUE (code),
+  CONSTRAINT uq_agencies_name   UNIQUE (name),
   CONSTRAINT chk_agencies_status CHECK (status IN ('active','inactive'))
 );
 
+-- ============================================================
+-- 2. ADMINS
+-- ============================================================
 CREATE TABLE IF NOT EXISTS admins (
   id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   email                  VARCHAR(255) NOT NULL,
@@ -42,11 +40,15 @@ CREATE TABLE IF NOT EXISTS admins (
   CONSTRAINT uq_admins_email UNIQUE (email),
   CONSTRAINT chk_admins_role CHECK (role IN ('super_admin','agency_manager')),
   CONSTRAINT chk_admins_agency_role CHECK (
-    (role = 'super_admin' AND agency_id IS NULL AND created_by_admin_id IS NULL) OR
+    (role = 'super_admin'    AND agency_id IS NULL     AND created_by_admin_id IS NULL) OR
     (role = 'agency_manager' AND agency_id IS NOT NULL AND created_by_admin_id IS NOT NULL)
   )
 );
 
+-- ============================================================
+-- 3. DRIVERS
+-- Giữ nguyên DB v2: agency_id, on_trip status
+-- ============================================================
 CREATE TABLE IF NOT EXISTS drivers (
   id                      UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by_admin_id     UUID         REFERENCES admins(id) ON DELETE SET NULL,
@@ -63,12 +65,16 @@ CREATE TABLE IF NOT EXISTS drivers (
   status                  VARCHAR(20)  NOT NULL DEFAULT 'active',
   created_at              TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_drivers_phone UNIQUE (phone),
+  CONSTRAINT uq_drivers_phone   UNIQUE (phone),
   CONSTRAINT uq_drivers_license UNIQUE (license_number),
   CONSTRAINT chk_drivers_status CHECK (status IN ('active','on_trip','banned')),
-  CONSTRAINT chk_drivers_score CHECK (safety_score >= 0 AND safety_score <= 100)
+  CONSTRAINT chk_drivers_score  CHECK (safety_score >= 0 AND safety_score <= 100)
 );
 
+-- ============================================================
+-- 4. VEHICLES
+-- Fix: thêm 'retired' vào status (DB v2 bị thiếu)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS vehicles (
   id                       UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   agency_id                UUID         NOT NULL REFERENCES agencies(id) ON DELETE RESTRICT,
@@ -82,11 +88,15 @@ CREATE TABLE IF NOT EXISTS vehicles (
   insurance_expiry_date    DATE         NOT NULL,
   created_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_vehicles_plate UNIQUE (license_plate),
-  CONSTRAINT chk_vehicles_status CHECK (status IN ('available','on_trip','maintenance')),
-  CONSTRAINT chk_vehicles_seats CHECK (seat_count > 0)
+  CONSTRAINT uq_vehicles_plate   UNIQUE (license_plate),
+  CONSTRAINT chk_vehicles_status CHECK (status IN ('available','on_trip','maintenance','retired')), -- Fix
+  CONSTRAINT chk_vehicles_seats  CHECK (seat_count > 0)
 );
 
+-- ============================================================
+-- 5. ROUTES
+-- Fix: thêm updated_at + trigger (DB v2 bị thiếu)
+-- ============================================================
 CREATE TABLE IF NOT EXISTS routes (
   id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   name                   VARCHAR(200) NOT NULL,
@@ -95,9 +105,14 @@ CREATE TABLE IF NOT EXISTS routes (
   distance_km            FLOAT,
   estimated_duration_min INTEGER,
   is_active              BOOLEAN      NOT NULL DEFAULT TRUE,
-  created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(), -- Fix
+  CONSTRAINT chk_routes_distance CHECK (distance_km IS NULL OR distance_km > 0)
 );
 
+-- ============================================================
+-- 6. EDGE_DEVICES
+-- ============================================================
 CREATE TABLE IF NOT EXISTS edge_devices (
   id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_id       UUID         NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
@@ -107,10 +122,13 @@ CREATE TABLE IF NOT EXISTS edge_devices (
   last_seen_at     TIMESTAMPTZ,
   registered_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_edge_vehicle UNIQUE (vehicle_id),
-  CONSTRAINT uq_edge_token UNIQUE (device_token),
+  CONSTRAINT uq_edge_token   UNIQUE (device_token),
   CONSTRAINT chk_edge_status CHECK (status IN ('active','inactive','lost','decommissioned'))
 );
 
+-- ============================================================
+-- 7. TRIPS
+-- ============================================================
 CREATE TABLE IF NOT EXISTS trips (
   id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_id           UUID         NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT,
@@ -128,11 +146,14 @@ CREATE TABLE IF NOT EXISTS trips (
   end_lng              FLOAT,
   created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_trips_code UNIQUE (trip_code),
-  CONSTRAINT chk_trips_status CHECK (status IN ('scheduled','active','completed','cancelled')),
+  CONSTRAINT uq_trips_code     UNIQUE (trip_code),
+  CONSTRAINT chk_trips_status  CHECK (status IN ('scheduled','active','completed','cancelled')),
   CONSTRAINT chk_trips_schedule CHECK (scheduled_arrival > scheduled_departure)
 );
 
+-- ============================================================
+-- 8. TRIP_DRIVERS
+-- ============================================================
 CREATE TABLE IF NOT EXISTS trip_drivers (
   id                       UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id                  UUID        NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
@@ -146,11 +167,16 @@ CREATE TABLE IF NOT EXISTS trip_drivers (
   is_current_driver        BOOLEAN     NOT NULL DEFAULT FALSE,
   CONSTRAINT uq_td_trip_driver UNIQUE (trip_id, driver_id),
   CONSTRAINT chk_td_role CHECK (role IN ('primary','relief')),
-  CONSTRAINT chk_td_fvs CHECK (face_verification_status IN ('pending','verified','failed'))
+  CONSTRAINT chk_td_fvs  CHECK (face_verification_status IN ('pending','verified','failed'))
 );
 
+-- ============================================================
+-- 9. VIOLATION_LOGS
+-- Fix: id KHÔNG có DEFAULT (UUID phải do thiết bị AI sinh)
+-- Idempotency đảm bảo qua ON CONFLICT ở service layer
+-- ============================================================
 CREATE TABLE IF NOT EXISTS violation_logs (
-  id                 UUID        PRIMARY KEY,
+  id                 UUID        PRIMARY KEY, -- Không DEFAULT: thiết bị AI bắt buộc gửi id
   trip_id            UUID        NOT NULL REFERENCES trips(id) ON DELETE RESTRICT,
   driver_id          UUID        NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
   violation_type     VARCHAR(50) NOT NULL,
@@ -164,12 +190,15 @@ CREATE TABLE IF NOT EXISTS violation_logs (
   sync_status        VARCHAR(20) NOT NULL DEFAULT 'pending',
   occurred_at        TIMESTAMPTZ NOT NULL,
   synced_at          TIMESTAMPTZ,
-  CONSTRAINT chk_vl_type CHECK (violation_type IN ('drowsiness','distraction','yawning','phone','identity_mismatch')),
+  CONSTRAINT chk_vl_type     CHECK (violation_type IN ('drowsiness','distraction','yawning','phone','identity_mismatch')),
   CONSTRAINT chk_vl_severity CHECK (severity IN ('low','medium','high')),
-  CONSTRAINT chk_vl_sync CHECK (sync_status IN ('pending','synced')),
-  CONSTRAINT chk_vl_speed CHECK (speed_kmh >= 0)
+  CONSTRAINT chk_vl_sync     CHECK (sync_status IN ('pending','synced')),
+  CONSTRAINT chk_vl_speed    CHECK (speed_kmh >= 0)
 );
 
+-- ============================================================
+-- 10. VIOLATION_ALERT_LOGS
+-- ============================================================
 CREATE TABLE IF NOT EXISTS violation_alert_logs (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   violation_log_id    UUID        NOT NULL REFERENCES violation_logs(id) ON DELETE RESTRICT,
@@ -181,6 +210,9 @@ CREATE TABLE IF NOT EXISTS violation_alert_logs (
   CONSTRAINT chk_val_status CHECK (status IN ('pending','acknowledged','resolved'))
 );
 
+-- ============================================================
+-- 11. GPS_TRACKING
+-- ============================================================
 CREATE TABLE IF NOT EXISTS gps_tracking (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id     UUID        NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
@@ -189,17 +221,16 @@ CREATE TABLE IF NOT EXISTS gps_tracking (
   speed_kmh   FLOAT       NOT NULL DEFAULT 0.0,
   heading     FLOAT,
   recorded_at TIMESTAMPTZ NOT NULL,
-  CONSTRAINT chk_gps_lat CHECK (lat BETWEEN -90 AND 90),
-  CONSTRAINT chk_gps_lng CHECK (lng BETWEEN -180 AND 180),
+  CONSTRAINT chk_gps_lat   CHECK (lat BETWEEN -90 AND 90),
+  CONSTRAINT chk_gps_lng   CHECK (lng BETWEEN -180 AND 180),
   CONSTRAINT chk_gps_speed CHECK (speed_kmh >= 0)
 );
 
--- -----------------------------------------------------------------------------
--- Future account/payroll extension
--- These tables are designed for the next phase where agencies create driver
--- login accounts and payroll is calculated from actual working logs.
--- -----------------------------------------------------------------------------
+-- ============================================================
+-- FUTURE EXTENSION (Sprint 2+)
+-- ============================================================
 
+-- 12. DRIVER_ACCOUNTS
 CREATE TABLE IF NOT EXISTS driver_accounts (
   id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   driver_id              UUID         NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
@@ -214,10 +245,11 @@ CREATE TABLE IF NOT EXISTS driver_accounts (
   created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_driver_accounts_driver_id UNIQUE (driver_id),
-  CONSTRAINT uq_driver_accounts_username UNIQUE (username),
+  CONSTRAINT uq_driver_accounts_username  UNIQUE (username),
   CONSTRAINT chk_driver_accounts_username CHECK (char_length(trim(username)) >= 4)
 );
 
+-- 13. DRIVER_SALARY_CONTRACTS
 CREATE TABLE IF NOT EXISTS driver_salary_contracts (
   id                     UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   driver_id              UUID          NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
@@ -236,19 +268,16 @@ CREATE TABLE IF NOT EXISTS driver_salary_contracts (
   notes                  TEXT,
   created_at             TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_driver_salary_contracts_driver_from UNIQUE (driver_id, effective_from),
-  CONSTRAINT chk_driver_salary_contracts_type CHECK (salary_type IN ('monthly','per_trip','hourly','hybrid')),
-  CONSTRAINT chk_driver_salary_contracts_amounts CHECK (
-    base_salary >= 0 AND
-    per_trip_rate >= 0 AND
-    per_hour_rate >= 0 AND
-    overtime_rate >= 0 AND
-    allowance_amount >= 0 AND
-    violation_penalty_rate >= 0
+  CONSTRAINT uq_dsc_driver_from UNIQUE (driver_id, effective_from),
+  CONSTRAINT chk_dsc_type CHECK (salary_type IN ('monthly','per_trip','hourly','hybrid')),
+  CONSTRAINT chk_dsc_amounts CHECK (
+    base_salary >= 0 AND per_trip_rate >= 0 AND per_hour_rate >= 0 AND
+    overtime_rate >= 0 AND allowance_amount >= 0 AND violation_penalty_rate >= 0
   ),
-  CONSTRAINT chk_driver_salary_contracts_period CHECK (effective_to IS NULL OR effective_to >= effective_from)
+  CONSTRAINT chk_dsc_period CHECK (effective_to IS NULL OR effective_to >= effective_from)
 );
 
+-- 14. DRIVER_WORK_LOGS
 CREATE TABLE IF NOT EXISTS driver_work_logs (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   driver_id        UUID        NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
@@ -268,22 +297,21 @@ CREATE TABLE IF NOT EXISTS driver_work_logs (
   notes            TEXT,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT chk_driver_work_logs_minutes CHECK (
-    worked_minutes >= 0 AND
-    overtime_minutes >= 0 AND
-    trip_count >= 0 AND
-    violation_count >= 0
+  CONSTRAINT chk_dwl_minutes CHECK (
+    worked_minutes >= 0 AND overtime_minutes >= 0 AND
+    trip_count >= 0 AND violation_count >= 0
   ),
-  CONSTRAINT chk_driver_work_logs_status CHECK (status IN ('open','completed','approved','rejected')),
-  CONSTRAINT chk_driver_work_logs_sources CHECK (
+  CONSTRAINT chk_dwl_status  CHECK (status IN ('open','completed','approved','rejected')),
+  CONSTRAINT chk_dwl_sources CHECK (
     checkin_source IN ('mobile','device','manual') AND
     (checkout_source IS NULL OR checkout_source IN ('mobile','device','manual'))
   ),
-  CONSTRAINT chk_driver_work_logs_time CHECK (
+  CONSTRAINT chk_dwl_time CHECK (
     checkin_at IS NULL OR checkout_at IS NULL OR checkout_at >= checkin_at
   )
 );
 
+-- 15. SALARY_CONFIG
 CREATE TABLE IF NOT EXISTS salary_config (
   id           UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   config_key   VARCHAR(100)  NOT NULL,
@@ -294,55 +322,50 @@ CREATE TABLE IF NOT EXISTS salary_config (
   CONSTRAINT chk_salary_config_val CHECK (config_value >= 0)
 );
 
+-- 16. SALARY_RECORDS
 CREATE TABLE IF NOT EXISTS salary_records (
-  id                    UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  driver_id             UUID          NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
-  agency_id             UUID          NOT NULL REFERENCES agencies(id) ON DELETE RESTRICT,
-  contract_id           UUID                   REFERENCES driver_salary_contracts(id) ON DELETE SET NULL,
-  month                 INTEGER       NOT NULL,
-  year                  INTEGER       NOT NULL,
-  total_trips           INTEGER       NOT NULL DEFAULT 0,
-  total_violations      INTEGER       NOT NULL DEFAULT 0,
-  total_work_minutes    INTEGER       NOT NULL DEFAULT 0,
-  total_overtime_minutes INTEGER      NOT NULL DEFAULT 0,
-  base_salary           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  trip_bonus            DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  overtime_pay          DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  allowance_amount      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  violation_penalty     DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  bonus_amount          DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  gross_salary          DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  net_salary            DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-  safety_score_snapshot FLOAT,
-  status                VARCHAR(20)   NOT NULL DEFAULT 'draft',
-  calculated_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  paid_at               TIMESTAMPTZ,
-  exported_at           TIMESTAMPTZ,
-  exported_by           UUID          REFERENCES admins(id) ON DELETE SET NULL,
-  created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  updated_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  id                     UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  driver_id              UUID          NOT NULL REFERENCES drivers(id) ON DELETE RESTRICT,
+  agency_id              UUID          NOT NULL REFERENCES agencies(id) ON DELETE RESTRICT,
+  contract_id            UUID                   REFERENCES driver_salary_contracts(id) ON DELETE SET NULL,
+  month                  INTEGER       NOT NULL,
+  year                   INTEGER       NOT NULL,
+  total_trips            INTEGER       NOT NULL DEFAULT 0,
+  total_violations       INTEGER       NOT NULL DEFAULT 0,
+  total_work_minutes     INTEGER       NOT NULL DEFAULT 0,
+  total_overtime_minutes INTEGER       NOT NULL DEFAULT 0,
+  base_salary            DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  trip_bonus             DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  overtime_pay           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  allowance_amount       DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  violation_penalty      DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  bonus_amount           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  gross_salary           DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  net_salary             DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  safety_score_snapshot  FLOAT,
+  status                 VARCHAR(20)   NOT NULL DEFAULT 'draft',
+  calculated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  paid_at                TIMESTAMPTZ,
+  exported_at            TIMESTAMPTZ,
+  exported_by            UUID          REFERENCES admins(id) ON DELETE SET NULL,
+  created_at             TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_sr_driver_month_year UNIQUE (driver_id, month, year),
-  CONSTRAINT chk_sr_month CHECK (month BETWEEN 1 AND 12),
-  CONSTRAINT chk_sr_year CHECK (year >= 2024),
+  CONSTRAINT chk_sr_month  CHECK (month BETWEEN 1 AND 12),
+  CONSTRAINT chk_sr_year   CHECK (year >= 2024),
   CONSTRAINT chk_sr_status CHECK (status IN ('draft','confirmed','paid')),
   CONSTRAINT chk_sr_totals CHECK (
-    total_trips >= 0 AND
-    total_violations >= 0 AND
-    total_work_minutes >= 0 AND
-    total_overtime_minutes >= 0
+    total_trips >= 0 AND total_violations >= 0 AND
+    total_work_minutes >= 0 AND total_overtime_minutes >= 0
   ),
   CONSTRAINT chk_sr_amounts CHECK (
-    base_salary >= 0 AND
-    trip_bonus >= 0 AND
-    overtime_pay >= 0 AND
-    allowance_amount >= 0 AND
-    violation_penalty >= 0 AND
-    bonus_amount >= 0 AND
-    gross_salary >= 0 AND
-    net_salary >= 0
+    base_salary >= 0 AND trip_bonus >= 0 AND overtime_pay >= 0 AND
+    allowance_amount >= 0 AND violation_penalty >= 0 AND
+    bonus_amount >= 0 AND gross_salary >= 0 AND net_salary >= 0
   )
 );
 
+-- 17. SYNC_LOGS
 CREATE TABLE IF NOT EXISTS sync_logs (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id        UUID        NOT NULL REFERENCES edge_devices(id) ON DELETE CASCADE,
@@ -353,46 +376,14 @@ CREATE TABLE IF NOT EXISTS sync_logs (
   error_message    TEXT,
   attempted_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   succeeded_at     TIMESTAMPTZ,
-  CONSTRAINT chk_sl_type CHECK (sync_type IN ('violation','gps_batch','faceid')),
+  CONSTRAINT chk_sl_type   CHECK (sync_type IN ('violation','gps_batch','faceid')),
   CONSTRAINT chk_sl_status CHECK (status IN ('pending','success','failed','retrying')),
-  CONSTRAINT chk_sl_retry CHECK (retry_count >= 0)
+  CONSTRAINT chk_sl_retry  CHECK (retry_count >= 0)
 );
 
-ALTER TABLE agencies DROP CONSTRAINT IF EXISTS chk_agencies_status;
-ALTER TABLE agencies
-  ADD CONSTRAINT chk_agencies_status CHECK (status IN ('active','inactive'));
-
-ALTER TABLE violation_logs
-  ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
-CREATE INDEX IF NOT EXISTS idx_admins_agency_id ON admins (agency_id);
-CREATE INDEX IF NOT EXISTS idx_drivers_agency_id ON drivers (agency_id);
-CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers (status);
-CREATE INDEX IF NOT EXISTS idx_driver_accounts_created_by_admin_id ON driver_accounts (created_by_admin_id);
-CREATE INDEX IF NOT EXISTS idx_driver_work_logs_driver_date ON driver_work_logs (driver_id, work_date DESC);
-CREATE INDEX IF NOT EXISTS idx_driver_work_logs_trip_id ON driver_work_logs (trip_id);
-CREATE INDEX IF NOT EXISTS idx_driver_work_logs_agency_date ON driver_work_logs (agency_id, work_date DESC);
-CREATE INDEX IF NOT EXISTS idx_driver_salary_contracts_driver_id ON driver_salary_contracts (driver_id);
-CREATE INDEX IF NOT EXISTS idx_driver_salary_contracts_agency_id ON driver_salary_contracts (agency_id);
-CREATE INDEX IF NOT EXISTS idx_vehicles_agency_id ON vehicles (agency_id);
-CREATE INDEX IF NOT EXISTS idx_vehicles_status ON vehicles (status);
-CREATE INDEX IF NOT EXISTS idx_trips_status ON trips (status);
-CREATE INDEX IF NOT EXISTS idx_trips_departure ON trips (scheduled_departure) WHERE status = 'scheduled';
-CREATE INDEX IF NOT EXISTS idx_td_driver ON trip_drivers (driver_id);
-CREATE INDEX IF NOT EXISTS idx_td_trip ON trip_drivers (trip_id);
-CREATE INDEX IF NOT EXISTS idx_td_current ON trip_drivers (trip_id) WHERE is_current_driver = TRUE;
-CREATE INDEX IF NOT EXISTS idx_vl_driver_time ON violation_logs (driver_id, occurred_at DESC);
-CREATE INDEX IF NOT EXISTS idx_vl_trip ON violation_logs (trip_id);
-CREATE INDEX IF NOT EXISTS idx_vl_pending ON violation_logs (trip_id) WHERE sync_status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_gps_trip_time ON gps_tracking (trip_id, recorded_at DESC);
-CREATE INDEX IF NOT EXISTS idx_val_pending ON violation_alert_logs (created_at DESC) WHERE status = 'pending';
-CREATE INDEX IF NOT EXISTS idx_salary_records_agency_period ON salary_records (agency_id, year, month);
-CREATE INDEX IF NOT EXISTS idx_salary_records_status ON salary_records (status);
-CREATE INDEX IF NOT EXISTS idx_admins_created_by_admin_id ON admins (created_by_admin_id);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_driver_salary_contracts_one_active
-  ON driver_salary_contracts (driver_id)
-  WHERE is_active = TRUE;
-
+-- ============================================================
+-- TRIGGERS: fn_set_updated_at
+-- ============================================================
 CREATE OR REPLACE FUNCTION fn_set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -401,142 +392,169 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Áp dụng cho tất cả bảng có updated_at
+DO $$ BEGIN CREATE TRIGGER trg_agencies_updated_at
+  BEFORE UPDATE ON agencies FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_admins_updated_at
+  BEFORE UPDATE ON admins FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_drivers_updated_at
+  BEFORE UPDATE ON drivers FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_vehicles_updated_at
+  BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_routes_updated_at          -- Fix: routes cần trigger
+  BEFORE UPDATE ON routes FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_trips_updated_at
+  BEFORE UPDATE ON trips FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_driver_accounts_updated_at
+  BEFORE UPDATE ON driver_accounts FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_driver_salary_contracts_updated_at
+  BEFORE UPDATE ON driver_salary_contracts FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_driver_work_logs_updated_at
+  BEFORE UPDATE ON driver_work_logs FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TRIGGER trg_salary_records_updated_at
+  BEFORE UPDATE ON salary_records FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ============================================================
+-- TRIGGERS: BUSINESS LOGIC VALIDATION
+-- ============================================================
 CREATE OR REPLACE FUNCTION fn_validate_admin_creator()
 RETURNS TRIGGER AS $$
-DECLARE
-  creator_role VARCHAR(30);
+DECLARE creator_role VARCHAR(30);
 BEGIN
   IF NEW.role = 'super_admin' THEN
     IF NEW.created_by_admin_id IS NOT NULL THEN
-      RAISE EXCEPTION 'super_admin accounts must be bootstrapped and cannot have a creator';
+      RAISE EXCEPTION 'super_admin cannot have a creator';
     END IF;
-
     RETURN NEW;
   END IF;
-
-  SELECT role INTO creator_role
-  FROM admins
-  WHERE id = NEW.created_by_admin_id;
-
+  SELECT role INTO creator_role FROM admins WHERE id = NEW.created_by_admin_id;
   IF creator_role IS NULL THEN
-    RAISE EXCEPTION 'agency_manager must be created by an existing super_admin account';
+    RAISE EXCEPTION 'agency_manager must be created by an existing admin';
   END IF;
-
   IF creator_role <> 'super_admin' THEN
-    RAISE EXCEPTION 'agency_manager must be created by a super_admin account';
+    RAISE EXCEPTION 'agency_manager must be created by a super_admin';
   END IF;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DO $$ BEGIN CREATE TRIGGER trg_validate_admin_creator
+  BEFORE INSERT OR UPDATE ON admins FOR EACH ROW EXECUTE FUNCTION fn_validate_admin_creator();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE OR REPLACE FUNCTION fn_validate_driver_account_creator()
 RETURNS TRIGGER AS $$
 DECLARE
-  creator_role VARCHAR(30);
+  creator_role      VARCHAR(30);
   creator_agency_id UUID;
-  driver_agency_id UUID;
+  driver_agency_id  UUID;
 BEGIN
   SELECT role, agency_id INTO creator_role, creator_agency_id
-  FROM admins
-  WHERE id = NEW.created_by_admin_id;
-
+    FROM admins WHERE id = NEW.created_by_admin_id;
   IF creator_role IS NULL THEN
-    RAISE EXCEPTION 'driver account creator must be an existing admin account';
+    RAISE EXCEPTION 'creator must be an existing admin';
   END IF;
-
-  SELECT agency_id INTO driver_agency_id
-  FROM drivers
-  WHERE id = NEW.driver_id;
-
+  SELECT agency_id INTO driver_agency_id FROM drivers WHERE id = NEW.driver_id;
   IF driver_agency_id IS NULL THEN
     RAISE EXCEPTION 'driver account must reference an existing driver';
   END IF;
-
   IF creator_role <> 'agency_manager' THEN
-    RAISE EXCEPTION 'driver accounts must be created by an agency_manager account';
+    RAISE EXCEPTION 'driver accounts must be created by an agency_manager';
   END IF;
-
   IF creator_agency_id IS DISTINCT FROM driver_agency_id THEN
-    RAISE EXCEPTION 'agency_manager can only create driver accounts inside the same agency';
+    RAISE EXCEPTION 'agency_manager can only create accounts within same agency';
   END IF;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DO $$ BEGIN CREATE TRIGGER trg_validate_driver_account_creator
+  BEFORE INSERT OR UPDATE ON driver_accounts FOR EACH ROW
+  EXECUTE FUNCTION fn_validate_driver_account_creator();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE OR REPLACE FUNCTION fn_validate_driver_salary_contract()
 RETURNS TRIGGER AS $$
 DECLARE
-  driver_agency_id UUID;
-  creator_role VARCHAR(30);
+  driver_agency_id  UUID;
+  creator_role      VARCHAR(30);
   creator_agency_id UUID;
 BEGIN
-  SELECT agency_id INTO driver_agency_id
-  FROM drivers
-  WHERE id = NEW.driver_id;
-
+  SELECT agency_id INTO driver_agency_id FROM drivers WHERE id = NEW.driver_id;
   IF driver_agency_id IS NULL THEN
     RAISE EXCEPTION 'salary contract must reference an existing driver';
   END IF;
-
   IF NEW.agency_id IS DISTINCT FROM driver_agency_id THEN
     RAISE EXCEPTION 'salary contract agency must match driver agency';
   END IF;
-
   IF NEW.created_by_admin_id IS NOT NULL THEN
     SELECT role, agency_id INTO creator_role, creator_agency_id
-    FROM admins
-    WHERE id = NEW.created_by_admin_id;
-
+      FROM admins WHERE id = NEW.created_by_admin_id;
     IF creator_role IS NULL THEN
-      RAISE EXCEPTION 'salary contract creator must be an existing admin account';
+      RAISE EXCEPTION 'creator must be an existing admin';
     END IF;
-
     IF creator_role <> 'super_admin' AND creator_agency_id IS DISTINCT FROM NEW.agency_id THEN
       RAISE EXCEPTION 'only super_admin or same-agency manager can create salary contracts';
     END IF;
   END IF;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DO $$ BEGIN CREATE TRIGGER trg_validate_driver_salary_contract
+  BEFORE INSERT OR UPDATE ON driver_salary_contracts FOR EACH ROW
+  EXECUTE FUNCTION fn_validate_driver_salary_contract();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE OR REPLACE FUNCTION fn_validate_driver_work_log()
 RETURNS TRIGGER AS $$
 DECLARE
-  driver_agency_id UUID;
+  driver_agency_id  UUID;
   vehicle_agency_id UUID;
 BEGIN
-  SELECT agency_id INTO driver_agency_id
-  FROM drivers
-  WHERE id = NEW.driver_id;
-
+  SELECT agency_id INTO driver_agency_id FROM drivers WHERE id = NEW.driver_id;
   IF driver_agency_id IS NULL THEN
     RAISE EXCEPTION 'work log must reference an existing driver';
   END IF;
-
   IF NEW.agency_id IS DISTINCT FROM driver_agency_id THEN
     RAISE EXCEPTION 'work log agency must match driver agency';
   END IF;
-
   IF NEW.vehicle_id IS NOT NULL THEN
-    SELECT agency_id INTO vehicle_agency_id
-    FROM vehicles
-    WHERE id = NEW.vehicle_id;
-
+    SELECT agency_id INTO vehicle_agency_id FROM vehicles WHERE id = NEW.vehicle_id;
     IF vehicle_agency_id IS NULL THEN
       RAISE EXCEPTION 'work log vehicle must reference an existing vehicle';
     END IF;
-
     IF vehicle_agency_id IS DISTINCT FROM NEW.agency_id THEN
-      RAISE EXCEPTION 'work log vehicle must belong to the same agency';
+      RAISE EXCEPTION 'work log vehicle must belong to same agency';
     END IF;
   END IF;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DO $$ BEGIN CREATE TRIGGER trg_validate_driver_work_log
+  BEFORE INSERT OR UPDATE ON driver_work_logs FOR EACH ROW
+  EXECUTE FUNCTION fn_validate_driver_work_log();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE OR REPLACE FUNCTION fn_validate_salary_record()
 RETURNS TRIGGER AS $$
@@ -546,120 +564,59 @@ DECLARE
 BEGIN
   IF NEW.contract_id IS NOT NULL THEN
     SELECT driver_id, agency_id INTO contract_driver_id, contract_agency_id
-    FROM driver_salary_contracts
-    WHERE id = NEW.contract_id;
-
+      FROM driver_salary_contracts WHERE id = NEW.contract_id;
     IF contract_driver_id IS NULL THEN
-      RAISE EXCEPTION 'salary record contract must reference an existing salary contract';
+      RAISE EXCEPTION 'salary record must reference an existing contract';
     END IF;
-
-    IF contract_driver_id IS DISTINCT FROM NEW.driver_id OR contract_agency_id IS DISTINCT FROM NEW.agency_id THEN
+    IF contract_driver_id IS DISTINCT FROM NEW.driver_id OR
+       contract_agency_id IS DISTINCT FROM NEW.agency_id THEN
       RAISE EXCEPTION 'salary record must match contract driver and agency';
     END IF;
   END IF;
-
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DO $$ BEGIN
-  CREATE TRIGGER trg_agencies_updated_at
-    BEFORE UPDATE ON agencies
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+DO $$ BEGIN CREATE TRIGGER trg_validate_salary_record
+  BEFORE INSERT OR UPDATE ON salary_records FOR EACH ROW
+  EXECUTE FUNCTION fn_validate_salary_record();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-DO $$ BEGIN
-  CREATE TRIGGER trg_admins_updated_at
-    BEFORE UPDATE ON admins
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- ============================================================
+-- INDEXES
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_admins_agency_id            ON admins (agency_id);
+CREATE INDEX IF NOT EXISTS idx_admins_created_by           ON admins (created_by_admin_id);
+CREATE INDEX IF NOT EXISTS idx_drivers_agency_id           ON drivers (agency_id);
+CREATE INDEX IF NOT EXISTS idx_drivers_status              ON drivers (status);
+CREATE INDEX IF NOT EXISTS idx_vehicles_agency_id          ON vehicles (agency_id);
+CREATE INDEX IF NOT EXISTS idx_vehicles_status             ON vehicles (status);
+CREATE INDEX IF NOT EXISTS idx_trips_status                ON trips (status);
+CREATE INDEX IF NOT EXISTS idx_trips_departure             ON trips (scheduled_departure) WHERE status = 'scheduled';
+CREATE INDEX IF NOT EXISTS idx_td_driver                   ON trip_drivers (driver_id);
+CREATE INDEX IF NOT EXISTS idx_td_trip                     ON trip_drivers (trip_id);
+CREATE INDEX IF NOT EXISTS idx_td_current                  ON trip_drivers (trip_id) WHERE is_current_driver = TRUE;
+CREATE INDEX IF NOT EXISTS idx_vl_driver_time              ON violation_logs (driver_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vl_trip                     ON violation_logs (trip_id);
+CREATE INDEX IF NOT EXISTS idx_vl_pending                  ON violation_logs (trip_id) WHERE sync_status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_gps_trip_time               ON gps_tracking (trip_id, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_val_pending                 ON violation_alert_logs (created_at DESC) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_da_created_by               ON driver_accounts (created_by_admin_id);
+CREATE INDEX IF NOT EXISTS idx_dsc_driver_id               ON driver_salary_contracts (driver_id);
+CREATE INDEX IF NOT EXISTS idx_dsc_agency_id               ON driver_salary_contracts (agency_id);
+CREATE INDEX IF NOT EXISTS idx_dwl_driver_date             ON driver_work_logs (driver_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_dwl_trip_id                 ON driver_work_logs (trip_id);
+CREATE INDEX IF NOT EXISTS idx_dwl_agency_date             ON driver_work_logs (agency_id, work_date DESC);
+CREATE INDEX IF NOT EXISTS idx_sr_agency_period            ON salary_records (agency_id, year, month);
+CREATE INDEX IF NOT EXISTS idx_sr_status                   ON salary_records (status);
 
-DO $$ BEGIN
-  CREATE TRIGGER trg_validate_admin_creator
-    BEFORE INSERT OR UPDATE ON admins
-    FOR EACH ROW EXECUTE FUNCTION fn_validate_admin_creator();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- Partial unique index: chỉ 1 contract active per driver
+CREATE UNIQUE INDEX IF NOT EXISTS uq_dsc_one_active
+  ON driver_salary_contracts (driver_id) WHERE is_active = TRUE;
 
-DO $$ BEGIN
-  CREATE TRIGGER trg_drivers_updated_at
-    BEFORE UPDATE ON drivers
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_driver_accounts_updated_at
-    BEFORE UPDATE ON driver_accounts
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_validate_driver_account_creator
-    BEFORE INSERT OR UPDATE ON driver_accounts
-    FOR EACH ROW EXECUTE FUNCTION fn_validate_driver_account_creator();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_driver_salary_contracts_updated_at
-    BEFORE UPDATE ON driver_salary_contracts
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_validate_driver_salary_contract
-    BEFORE INSERT OR UPDATE ON driver_salary_contracts
-    FOR EACH ROW EXECUTE FUNCTION fn_validate_driver_salary_contract();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_driver_work_logs_updated_at
-    BEFORE UPDATE ON driver_work_logs
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_validate_driver_work_log
-    BEFORE INSERT OR UPDATE ON driver_work_logs
-    FOR EACH ROW EXECUTE FUNCTION fn_validate_driver_work_log();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_vehicles_updated_at
-    BEFORE UPDATE ON vehicles
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_trips_updated_at
-    BEFORE UPDATE ON trips
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_salary_records_updated_at
-    BEFORE UPDATE ON salary_records
-    FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  CREATE TRIGGER trg_validate_salary_record
-    BEFORE INSERT OR UPDATE ON salary_records
-    FOR EACH ROW EXECUTE FUNCTION fn_validate_salary_record();
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
+-- ============================================================
+-- SEED DATA
+-- ============================================================
 INSERT INTO salary_config (config_key, config_value, description) VALUES
   ('base_salary',                5000000, 'Luong cung moi thang (VND)'),
   ('bonus_per_trip',             50000,   'Thuong moi ca lai hoan thanh (VND)'),

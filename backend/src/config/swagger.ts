@@ -54,17 +54,16 @@ const options: swaggerJsdoc.Options = {
     info: {
       title:       'SmartDrive API',
       version:     '1.0.0',
-      description: 'API documentation cho hệ thống SmartDrive. Phan quyen nghiep vu: Super Admin -> Dai ly (Agency Manager) -> Tai xe / Phuong tien. Hien tai cac module agency, driver va vehicle chi con luong tao, xem, sua va xoa truc tiep.',
+      description: 'API documentation cho he thong SmartDrive. Phan quyen nghiep vu: Super Admin -> Dai ly (Agency Manager) -> Tai xe / Phuong tien. Hien tai cac module publish cho FE gom auth, agency, driver va vehicle.',
     },
     servers: [
-      { url: 'http://localhost:5001', description: 'Development server' }
+      { url: 'http://localhost:5000', description: 'Development server' }
     ],
     tags: [
       { name: 'Auth', description: 'Dang nhap va quan ly xac thuc' },
       { name: 'Agencies', description: 'Quan ly cap dai ly / nha xe' },
       { name: 'Drivers', description: 'Quan ly tai xe theo dai ly' },
       { name: 'Vehicles', description: 'Quan ly phuong tien theo dai ly' },
-      { name: 'DriverAccounts', description: 'Quan ly tai khoan dang nhap cua tai xe' },
     ],
     components: {
       securitySchemes: {
@@ -110,7 +109,7 @@ const options: swaggerJsdoc.Options = {
             name: { type: 'string', example: 'Nha xe Da Nang' },
             address: { type: 'string', example: '15 Hai Chau, Da Nang' },
             contact_phone: { type: 'string', example: '0905123456' },
-            status: { type: 'string', enum: ['active'], example: 'active' },
+            status: { type: 'string', enum: ['active', 'inactive'], example: 'active' },
             manager_count: { type: 'integer', example: 1 },
             driver_count: { type: 'integer', example: 5 },
             vehicle_count: { type: 'integer', example: 4 },
@@ -126,7 +125,7 @@ const options: swaggerJsdoc.Options = {
             name: { type: 'string', example: 'Nha xe Da Nang' },
             address: { type: 'string', nullable: true, example: '15 Hai Chau, Da Nang' },
             contact_phone: { type: 'string', nullable: true, example: '0905123456' },
-            status: { type: 'string', enum: ['active'], example: 'active' },
+            status: { type: 'string', enum: ['active', 'inactive'], example: 'active' },
             created_at: { type: 'string', format: 'date-time', example: '2026-03-28T12:00:00.000Z' },
             updated_at: { type: 'string', format: 'date-time', example: '2026-03-28T12:10:00.000Z' },
           },
@@ -185,7 +184,7 @@ const options: swaggerJsdoc.Options = {
             vehicle_type: { type: 'string', example: 'ghe_ngoi' },
             registration_expiry_date: { type: 'string', format: 'date', example: '2026-12-31' },
             insurance_expiry_date: { type: 'string', format: 'date', example: '2026-10-31' },
-            status: { type: 'string', enum: ['available', 'on_trip', 'maintenance'], example: 'available' },
+            status: { type: 'string', enum: ['available', 'on_trip', 'maintenance', 'retired'], example: 'available' },
             agency_id: { type: 'string', format: 'uuid', example: '11111111-1111-1111-1111-111111111111', description: 'Chi can khi Super Admin tao/sua cho mot dai ly cu the' },
           },
         },
@@ -200,7 +199,7 @@ const options: swaggerJsdoc.Options = {
             model: { type: 'string', example: 'Universe' },
             seat_count: { type: 'integer', example: 45 },
             vehicle_type: { type: 'string', example: 'ghe_ngoi' },
-            status: { type: 'string', enum: ['available', 'on_trip', 'maintenance'], example: 'available' },
+            status: { type: 'string', enum: ['available', 'on_trip', 'maintenance', 'retired'], example: 'available' },
             registration_expiry_date: { type: 'string', format: 'date', example: '2026-12-31' },
             insurance_expiry_date: { type: 'string', format: 'date', example: '2026-10-31' },
             created_at: { type: 'string', format: 'date-time', example: '2026-03-28T12:00:00.000Z' },
@@ -258,7 +257,12 @@ const options: swaggerJsdoc.Options = {
     },
     security: [{ bearerAuth: [] }],
   },
-  apis: ['./src/apis/**/*.routes.ts'], // Quét tất cả file routes
+  apis: [
+    './src/apis/auth/auth.routes.ts',
+    './src/apis/agencies/agency.routes.ts',
+    './src/apis/drivers/driver.routes.ts',
+    './src/apis/vehicles/vehicle.routes.ts',
+  ],
 };
 
 export const swaggerSpec = sanitizeSwaggerNode(swaggerJsdoc(options));

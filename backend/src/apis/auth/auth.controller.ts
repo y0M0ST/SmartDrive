@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { changePasswordService, driverLoginService, forgotPasswordService, loginService , logoutService, resetPasswordService } from './auth.service';
+import { changePasswordService, forgotPasswordService, loginService , logoutService, resetPasswordService } from './auth.service';
 import { ApiResponse } from '../../common/types/response';
 import { AuthRequest } from '../../common/middlewares/auth.middleware';
 
@@ -44,53 +44,6 @@ export const login = async (req: Request, res: Response) => {
       success: false,
       message: 'Lỗi hệ thống, vui lòng thử lại sau',
       error: 'INTERNAL_ERROR'
-    } as ApiResponse);
-  }
-};
-
-export const driverLogin = async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
-    const result = await driverLoginService(email, password);
-
-    switch (result.code) {
-      case 'INVALID_CREDENTIALS':
-        return res.status(401).json({
-          success: false,
-          message: 'Email hoac mat khau khong chinh xac',
-          error: 'INVALID_CREDENTIALS',
-        } as ApiResponse);
-      case 'ACCOUNT_DISABLED':
-        return res.status(403).json({
-          success: false,
-          message: 'Tai khoan tai xe da bi vo hieu hoa',
-          error: 'ACCOUNT_DISABLED',
-        } as ApiResponse);
-      case 'AGENCY_INACTIVE':
-        return res.status(403).json({
-          success: false,
-          message: 'Dai ly cua ban khong con hoat dong',
-          error: 'AGENCY_INACTIVE',
-        } as ApiResponse);
-      case 'DRIVER_BLOCKED':
-        return res.status(403).json({
-          success: false,
-          message: 'Tai xe dang o trang thai khong duoc dang nhap',
-          error: 'DRIVER_BLOCKED',
-        } as ApiResponse);
-      default:
-        return res.status(200).json({
-          success: true,
-          message: 'Dang nhap tai xe thanh cong',
-          data: result.data,
-        } as ApiResponse);
-    }
-  } catch (err) {
-    console.error('[Auth] Driver login error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Loi he thong, vui long thu lai sau',
-      error: 'INTERNAL_ERROR',
     } as ApiResponse);
   }
 };

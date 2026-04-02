@@ -3,7 +3,7 @@ import { ApiResponse } from '../../common/types/response';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const licensePlateRegex = /^\d{2}[A-Z]{1,2}-\d{3}\.\d{2}$/i;
-const allowedStatuses = ['available', 'on_trip', 'maintenance'];
+const allowedStatuses = ['available', 'on_trip', 'maintenance', 'retired'];
 
 const isValidDateString = (value: string) => !Number.isNaN(Date.parse(value));
 
