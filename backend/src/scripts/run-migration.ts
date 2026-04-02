@@ -3,7 +3,7 @@ import path from 'path';
 import pool from '../config/database';
 
 async function runMigration() {
-  const sqlPath = path.join(__dirname, '001_init_schema.sql');
+  const sqlPath = path.join(__dirname, 'final_schema.sql');
   const sql = fs.readFileSync(sqlPath, 'utf8');
 
   try {
