@@ -9,6 +9,8 @@ import swaggerUi from 'swagger-ui-express';
 import './config/database';
 
 import authRoutes from './apis/auth/auth.routes';
+import adminRoutes from './apis/admins/admin.routes';
+import routeRoutes from './apis/routes/route.routes';
 
 import { swaggerSpec } from './config/swagger';
 
@@ -45,6 +47,8 @@ app.get('/swagger.json', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admins', adminRoutes);
+app.use('/api/routes', routeRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
