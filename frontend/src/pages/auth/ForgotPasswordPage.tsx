@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, Mail, Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-
+import { toast } from "sonner"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,11 +26,12 @@ type Step = 'email' | 'otp' | 'reset';
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>('email'); // Trạng thái bước hiện tại
+  const [step, setStep] = useState<Step>('email');
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState(""); // Lưu email để dùng cho bước sau
+  const [email, setEmail] = useState(""); 
+  const [otpCode, setOtpCode] = useState(""); // Lưu OTP tạm thời ở FE
 
-  // --- BƯỚC A: NHẬP EMAIL ---
+  // --- BƯỚC A: GỬI OTP (Khớp Swagger: /api/auth/forgot-password) ---
   const { register: regEmail, handleSubmit: handleEmailSubmit, formState: { errors: emailErr } } = useForm({
     resolver: zodResolver(emailSchema)
   });
@@ -38,62 +39,54 @@ export default function ForgotPasswordPage() {
   const onEmailSubmit = async (data: any) => {
     setLoading(true);
     try {
-      // Gọi API gửi OTP (Thay bằng link API thật)
-      await api.post("/auth/forgot-password/send-otp", { email: data.email });
+      // Backend của Minh dùng link này:
+      await api.post("/api/auth/forgot-password", { email: data.email });
       setEmail(data.email);
-      setStep('otp'); // Chuyển sang bước nhập OTP
+      toast.success("Mã OTP đã được gửi về Email!");
+      setStep('otp'); 
     } catch (error: any) {
-      // Ngoại lệ: Email không tồn tại
-      alert(error.response?.data?.message || "Email không tồn tại trong hệ thống.");
+      toast.error(error.response?.data?.message || "Email không tồn tại.");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- BƯỚC B: XÁC THỰC OTP (Verify Code) ---
+  // --- BƯỚC B: CHỈ LƯU OTP (Không gọi API vì Backend gộp chung vào bước cuối) ---
   const { register: regOtp, handleSubmit: handleOtpSubmit, formState: { errors: otpErr } } = useForm({
     resolver: zodResolver(otpSchema)
   });
 
-  const onOtpSubmit = async (data: any) => {
-    setLoading(true);
-    try {
-      // Gọi API xác thực OTP (API trả về 1 token tạm thời để đổi pass)
-      const res = await api.post("/auth/forgot-password/verify-otp", { email, otp: data.otp });
-      localStorage.setItem("reset_token", res.data.reset_token); // Lưu token tạm
-      setStep('reset'); // Chuyển sang bước đặt mật khẩu mới
-    } catch (error: any) {
-      alert("Mã OTP không chính xác hoặc đã hết hạn.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Sửa lại hàm onOtpSubmit ở Bước B
+const onOtpSubmit = async (data: any) => {
+  setOtpCode(data.otp); 
+    setStep('reset');
+};
 
-  // --- BƯỚC C: ĐẶT LẠI MẬT KHẨU MỚI ---
+  // --- BƯỚC C: RESET PASSWORD (Khớp Swagger: /api/auth/reset-password) ---
   const { register: regReset, handleSubmit: handleResetSubmit, formState: { errors: resetErr } } = useForm({
     resolver: zodResolver(resetPasswordSchema)
   });
 
   const onResetSubmit = async (data: any) => {
-    setLoading(true);
-    try {
-      const resetToken = localStorage.getItem("reset_token");
-      // Gọi API đặt mật khẩu mới (gửi kèm token tạm)
-      await api.post("/auth/forgot-password/reset-password", { 
-        token: resetToken, 
-        password: data.password 
-      });
-      alert("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.");
-      localStorage.removeItem("reset_token"); // Xóa token tạm
-      navigate("/login"); // Về trang đăng nhập
-    } catch (error: any) {
-      alert(error.response?.data?.message || "Link khôi phục đã hết hạn. Vui lòng thử lại.");
-      setStep('email'); // Đá về bước 1
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    // Backend sẽ kiểm tra OTP + Email + Pass mới ở ĐÂY
+    await api.post("/api/auth/reset-password", { 
+      email: email, 
+      otp: otpCode, // Mã 741482 bạn nhập ở bước trước
+      new_password: data.password,
+      confirm_password: data.confirmPassword
+    });
 
+    toast.success("Đổi mật khẩu thành công!");
+    navigate("/login");
+  } catch (error: any) {
+    // Nếu OTP sai, lúc này Backend mới báo lỗi 400
+    toast.error(error.response?.data?.message || "Mã OTP không chính xác hoặc hết hạn.");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <AuthLayout title={
       step === 'email' ? 'Forgot your password?' : 

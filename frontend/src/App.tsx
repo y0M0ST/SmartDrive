@@ -5,6 +5,8 @@ import LoginPage from "./pages/auth/LoginPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import RouteListPage from "./pages/routes/RouteListPage";
 import AccountManagementPage from "./pages/accounts/AccountManagementPage";
+import { Toaster } from "sonner";
+import AdminProfilePage from "./pages/profiles/AdminProfilePage";
 
 // Các Component test
 const AdminDashboard = () => (
@@ -16,9 +18,15 @@ const AdminDashboard = () => (
 
 const DriverPortal = () => <div className="p-10 text-3xl dark:text-white">Trang Cổng thông tin Tài xế</div>;
 
+
+
+
+
 function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light">
+    
+      <Toaster position="top-right" richColors  duration={1000} closeButton /> 
       <BrowserRouter>
         <Routes>
           {/* --- 1. ĐIỀU HƯỚNG MẶC ĐỊNH --- */}
@@ -33,25 +41,10 @@ function App() {
           <Route path="/admin/dashboard" element={<MainLayout><AdminDashboard /></MainLayout>} />
           <Route path="/admin/routes" element={<MainLayout><RouteListPage /></MainLayout>} />
           <Route path="/admin/accounts" element={<MainLayout><AccountManagementPage /></MainLayout>} />
+          <Route path="/admin/profile" element={<MainLayout><AdminProfilePage /></MainLayout>} />
           
-          {/* --- 4. TRANG PORTAL RIÊNG --- */}
-          <Route path="/portal/driver" element={<DriverPortal />} />
-
-          {/* --- 5. TRANG 404 --- */}
-          <Route path="*" element={
-            <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
-              <div className="text-center">
-                <h1 className="text-9xl font-black text-slate-200 dark:text-slate-800">404</h1>
-                <p className="text-2xl font-bold text-slate-800 dark:text-slate-200 -mt-8 px-4">Trang không tồn tại</p>
-                <button 
-                  onClick={() => window.location.href = '/login'}
-                  className="mt-6 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-extrabold shadow-lg shadow-blue-200 transition-all active:scale-95"
-                >
-                  QUAY LẠI ĐĂNG NHẬP
-                </button>
-              </div>
-            </div>
-          } />
+        
+          
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

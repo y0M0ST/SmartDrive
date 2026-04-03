@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react"; // Thư viện icon
-
+import { toast } from "sonner";
 // Thêm chữ "ui" vào giữa components và tên component
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,9 @@ import api from "@/services/api";
 
 // 1. Định nghĩa luật Validation (Lỗi đỏ)
 const loginSchema = z.object({
-  email: z.string().email({ message: "Email không hợp lệ" }),
-  password: z.string().min(1, { message: "Vui lòng nhập mật khẩu" }),
-  rememberMe: z.boolean().optional(), // Dùng .optional() để tránh lỗi Type
+  email: z.string().min(1, "E-mail không được bỏ trống").email("Email không hợp lệ"),
+  password: z.string().min(1, "Mật khẩu không được bỏ trống"),
+  rememberMe: z.boolean().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -34,51 +34,57 @@ export default function LoginPage() {
   // 2. Setup Form
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
+    mode: "onChange", // <--- THÊM DÒNG NÀY: Gõ đến đâu báo lỗi đến đó
   });
+
 
   // 3. Xử lý Logic Đăng nhập (US_01 Happy & Unhappy Path)
   const onSubmit = async (data: LoginFormValues) => {
-    setLoading(true);
-    try {
-      // Gọi API đăng nhập (Thay URL /auth/login bằng API thật của nhóm)
-      const res = await api.post("/auth/login", {
-        email: data.email,
-        password: data.password
-      });
-      
-      const { token, role, status } = res.data;
+  setLoading(true);
+  try {
+    const response = await api.post("/api/auth/login", {
+      email: data.email,
+      password: data.password
+    });
 
-      // Kiểm tra luồng ngoại lệ: Tài khoản bị khóa
-      if (status === "disabled") {
-        alert("Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin");
-        return;
-      }
+    const { success, message, data: authData } = response.data;
 
-      // Luồng thành công: Lưu Token
-      localStorage.setItem("access_token", token);
-      console.log("Đăng nhập thành công!", res.data);
+    if (success) {
+      // TC_LOGIN_01: Happy Path
+      toast.success("Đăng nhập thành công!"); // Hiện Toast xanh
+      localStorage.setItem("access_token", authData.token);
+      localStorage.setItem("user_info", JSON.stringify(authData.admin));
 
-      // Tự động phân luồng (Redirect) dựa vào role
-      if (role === "admin" || role === "coordinator") {
-        navigate("/admin/dashboard"); // Chuyển sang Web Admin
-      } else if (role === "driver") {
-        navigate("/portal/driver"); // Chuyển sang Cổng thông tin tài xế
-      } else {
-        alert("Vai trò tài khoản không hợp lệ.");
-      }
-
-    } catch (error: any) {
-      // Xử lý luồng ngoại lệ: Nhập sai tài khoản/mật khẩu
-      if (error.response && error.response.status === 401) {
-        alert("Tên đăng nhập hoặc mật khẩu không chính xác");
-      } else {
-        alert("Đã có lỗi xảy ra, vui lòng thử lại sau.");
-      }
-    } finally {
-      setLoading(false);
+      // Điều hướng dựa trên role
+      const role = authData.admin.role;
+      setTimeout(() => {
+        if (role === "super_admin" || role === "admin") navigate("/admin/dashboard");
+        else navigate("/portal/driver");
+      }, 1000);
     }
-  };
+  } catch (error: any) {
+    const errorData = error.response?.data;
+    const errorCode = errorData?.error; // Giả sử BE trả về mã error code
 
+    // TC_LOGIN_02: Sai mật khẩu
+    if (errorCode === "INVALID_CREDENTIALS" || error.response?.status === 401) {
+      toast.error("Sai mật khẩu rồi lêu lêww!");
+    } 
+    // TC_LOGIN_03: Tài khoản không tồn tại
+    else if (errorCode === "EMAIL_NOT_FOUND" || error.response?.status === 404) {
+      toast.error("Tài khoản không tồn tại");
+    }
+    // TC_LOGIN_05: Tài khoản bị khóa (Blocked)
+    else if (errorCode === "ACCOUNT_DISABLED" || error.response?.status === 403) {
+      toast.error("Tài khoản của bạn đã bị khóa, vui lòng liên hệ Admin");
+    }
+    else {
+      toast.error(errorData?.message || "Lỗi hệ thống, vui lòng thử lại sau");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <AuthLayout title="Đăng nhập">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -121,7 +127,7 @@ export default function LoginPage() {
         {/* Remember me & Quên mật khẩu */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Checkbox id="rememberMe" {...register("rememberMe")} />
+            <input type="checkbox" {...register("rememberMe")} />
             <Label htmlFor="rememberMe" className="text-sm font-normal">Remember me</Label>
           </div>
           <Link 

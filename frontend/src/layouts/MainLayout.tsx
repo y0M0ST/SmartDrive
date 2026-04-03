@@ -97,16 +97,30 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 mt-2 rounded-2xl shadow-2xl border-slate-100 dark:border-slate-800 p-2 z-[9999] bg-white dark:bg-slate-900">
-                <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
-                  <Icons.UserCircle size={18} className="text-slate-500" />
-                  <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">Tài khoản của tôi</span>
-                </DropdownMenuItem>
-                <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-2" />
-                <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500">
-                  <Icons.LogOut size={18} />
-                  <span className="font-bold text-sm">Đăng xuất</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
+  {/* BỌC THẺ LINK ĐỂ CHUYỂN TRANG */}
+  <Link to="/admin/profile" >
+  
+    <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 outline-none">
+      <Icons.UserCircle size={18} className="text-slate-500" />
+      <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">Tài khoản của tôi</span>
+    </DropdownMenuItem>
+  </Link>
+
+  <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-2" />
+
+  {/* XỬ LÝ ĐĂNG XUẤT THẬT */}
+  <DropdownMenuItem 
+    onClick={() => {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("user_role");
+      window.location.href = "/login";
+    }}
+    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500 outline-none"
+  >
+    <Icons.LogOut size={18} />
+    <span className="font-bold text-sm">Đăng xuất</span>
+  </DropdownMenuItem>
+</DropdownMenuContent>
             </DropdownMenu>
           </div>
         </header>
