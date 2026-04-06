@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { profileApi } from "@/services/profileApi";
@@ -40,8 +41,10 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export default function AdminProfilePage() {
+  const navigate = useNavigate();
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [isPassSuccessOpen, setIsPassSuccessOpen] = useState(false);
   const [showPass, setShowPass] = useState({ old: false, new: false, conf: false });
 
   const formProfile = useForm<ProfileFormValues>({ resolver: zodResolver(profileSchema) });
@@ -82,24 +85,25 @@ export default function AdminProfilePage() {
 
   // 3. XỬ LÝ TOAST CHO PASSWORD
   const onPasswordSubmit = async (data: PasswordFormValues) => {
-    try {
-      const res = await profileApi.changePassword({ 
-        oldPassword: data.oldPassword, 
-        newPassword: data.newPassword 
-      });
+  try {
+    await profileApi.changePassword({ 
+      oldPassword: data.oldPassword, 
+      newPassword: data.newPassword 
+    });
 
-      // Nếu không lỗi, Sonner sẽ hiện màu xanh rực rỡ
-      toast.success("Mật khẩu đã được thay đổi thành công!");
-      formPassword.reset();
-    } catch (error: any) {
-      const message = error.response?.status === 401 
-        ? "Mật khẩu cũ không chính xác!" 
-        : "Đổi mật khẩu thất bại, vui lòng thử lại.";
-      
-      // Hiện toast lỗi màu đỏ
-      toast.error(message);
-    }
-  };
+    // 1. Reset form mật khẩu cho sạch
+    formPassword.reset();
+    
+    // 2. Mở Modal thông báo thay vì dùng toast.success
+    setIsPassSuccessOpen(true); 
+
+  } catch (error: any) {
+    const message = error.response?.status === 401 
+      ? "Mật khẩu hiện tại không chính xác!" 
+      : "Đổi mật khẩu thất bại, vui lòng thử lại.";
+    toast.error(message);
+  }
+};
 
   const togglePass = (key: keyof typeof showPass) => setShowPass(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -190,6 +194,29 @@ export default function AdminProfilePage() {
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
-}
+      {/* Modal thông báo đổi mật khẩu thành công */}
+      {/* --- MODAL THÔNG BÁO THÀNH CÔNG --- */}
+      {isPassSuccessOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+              <Icons.Check className="text-green-600 dark:text-green-400 w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black text-slate-800 dark:text-white">Cập nhật thành công!</h2>
+              <p className="text-slate-500">Mật khẩu của bạn đã được thay đổi. Vui lòng đăng nhập lại để tiếp tục.</p>
+            </div>
+            <Button 
+              onClick={() => {
+                setIsPassSuccessOpen(false);
+                localStorage.clear(); // Xóa sạch để bảo mật
+                navigate("/login");    // Nhấn OK mới Out ra đây!
+              }} 
+className="w-full h-11 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all duration-200"            >
+              OK, Quay lại Đăng nhập
+            </Button>
+          </div>
+        </div>
+      )}
+    </div> // Thẻ đóng cuối cùng của trang
+  )}

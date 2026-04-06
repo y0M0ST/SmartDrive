@@ -109,17 +109,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-2" />
 
   {/* XỬ LÝ ĐĂNG XUẤT THẬT */}
-  <DropdownMenuItem 
-    onClick={() => {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("user_role");
-      window.location.href = "/login";
-    }}
-    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500 outline-none"
-  >
-    <Icons.LogOut size={18} />
-    <span className="font-bold text-sm">Đăng xuất</span>
-  </DropdownMenuItem>
+  {/* XỬ LÝ ĐĂNG XUẤT TRIỆT ĐỂ */}
+<DropdownMenuItem 
+  onClick={() => {
+    // 1. Xóa sạch mọi thứ để các tab khác nhận diện được ngay
+    localStorage.clear(); // Xóa sạch sành sanh cho an toàn
+    
+    // 2. Ép trình duyệt nhảy về Login và xóa sạch cache history
+    window.location.replace("/login"); 
+  }}
+  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500 outline-none"
+>
+  <Icons.LogOut size={18} />
+  <span className="font-bold text-sm">Đăng xuất</span>
+</DropdownMenuItem>
 </DropdownMenuContent>
             </DropdownMenu>
           </div>
