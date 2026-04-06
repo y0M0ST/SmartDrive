@@ -1,10 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  // 1. Đổi 8000 thành 5000 (Cổng BE của bạn)
-  // 2. Swagger của bạn khai báo các path đã có sẵn "/api", 
-  // nên baseURL chỉ cần dừng ở domain gốc để tránh bị lặp thành "/api/api/auth/login"
-baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "http://localhost:5000/api", // Đã có /api ở đây
+  headers: { "Content-Type": "application/json" }
 });
 
 // 1. REQUEST INTERCEPTOR: "Tự động nhét Token"

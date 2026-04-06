@@ -11,7 +11,7 @@ export const profileApi = {
   // 2. API Đổi mật khẩu (KHỚP 100% SWAGGER)
   // Endpoint: PUT /api/auth/change-password
   changePassword: (data: { oldPassword: string; newPassword: string }) => 
-    api.put("/api/auth/change-password", {
+    api.put("/auth/change-password", {
       old_password: data.oldPassword,    // Đúng tên gạch nối
       new_password: data.newPassword,    // Đúng tên gạch nối
       confirm_password: data.newPassword // Backend yêu cầu confirm_password

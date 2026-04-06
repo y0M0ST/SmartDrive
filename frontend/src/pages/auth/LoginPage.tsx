@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -28,6 +28,27 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+
+  // Dán cái này vào trong function LoginPage()
+  useEffect(() => {
+  // --- THÊM LOGIC NÀY ---
+  const token = localStorage.getItem("access_token");
+  if (token) {
+    navigate("/admin/dashboard", { replace: true });
+    return;
+  }
+  // ----------------------
+
+  // Logic chặn nút Back hiện tại của Minh giữ nguyên
+  window.history.pushState(null, "", window.location.href);
+  window.onpopstate = function () {
+    window.history.go(1);
+  };
+
+  return () => {
+    window.onpopstate = null;
+  };
+}, [navigate]);
   const [showPassword, setShowPassword] = useState(false); // Trạng thái ẩn/hiện mật khẩu
   const [loading, setLoading] = useState(false); // Trạng thái đang đăng nhập
 
@@ -42,48 +63,50 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
   setLoading(true);
   try {
-    const response = await api.post("/api/auth/login", {
+    const response = await api.post("/auth/login", {
       email: data.email,
       password: data.password
     });
 
     const { success, message, data: authData } = response.data;
 
-    if (success) {
-      // TC_LOGIN_01: Happy Path
-      toast.success("Đăng nhập thành công!"); // Hiện Toast xanh
-      localStorage.setItem("access_token", authData.token);
-      localStorage.setItem("user_info", JSON.stringify(authData.admin));
+    // Trong hàm onSubmit, phần điều hướng
+if (success) {
+  toast.success("Đăng nhập thành công!");
+  localStorage.setItem("access_token", authData.token);
+  localStorage.setItem("user_info", JSON.stringify(authData.admin));
 
-      // Điều hướng dựa trên role
-      const role = authData.admin.role;
-      setTimeout(() => {
-        if (role === "super_admin" || role === "admin") navigate("/admin/dashboard");
-        else navigate("/portal/driver");
-      }, 1000);
+  const role = authData.admin.role;
+  setTimeout(() => {
+    // Sửa lại các role được phép vào trang admin
+    if (role === "super_admin" || role === "agency_manager") {
+      navigate("/admin/dashboard");
+    } else {
+      navigate("/portal/driver");
     }
+  }, 1000);
+}
   } catch (error: any) {
-    const errorData = error.response?.data;
-    const errorCode = errorData?.error; // Giả sử BE trả về mã error code
+  const status = error.response?.status;
+  const errorData = error.response?.data;
 
-    // TC_LOGIN_02: Sai mật khẩu
-    if (errorCode === "INVALID_CREDENTIALS" || error.response?.status === 401) {
-      toast.error("Sai mật khẩu rồi lêu lêww!");
-    } 
-    // TC_LOGIN_03: Tài khoản không tồn tại
-    else if (errorCode === "EMAIL_NOT_FOUND" || error.response?.status === 404) {
-      toast.error("Tài khoản không tồn tại");
-    }
-    // TC_LOGIN_05: Tài khoản bị khóa (Blocked)
-    else if (errorCode === "ACCOUNT_DISABLED" || error.response?.status === 403) {
-      toast.error("Tài khoản của bạn đã bị khóa, vui lòng liên hệ Admin");
-    }
-    else {
-      toast.error(errorData?.message || "Lỗi hệ thống, vui lòng thử lại sau");
-    }
-  } finally {
-    setLoading(false);
+  // Trường hợp 401 (Sai pass) hoặc 404 (Không thấy email)
+  if (status === 401 || status === 404) {
+    toast.error("Tài khoản hoặc mật khẩu không chính xác!");
+  } 
+  
+  // Trường hợp 403 (Tài khoản bị khóa - cái này nên báo riêng để user biết)
+  else if (status === 403) {
+    toast.error("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin!");
   }
+
+  // Các lỗi khác (Server die, mất mạng...)
+  else {
+    toast.error(errorData?.message || "Lỗi hệ thống, vui lòng thử lại sau!");
+  }
+} finally {
+  setLoading(false);
+}
 };
   return (
     <AuthLayout title="Đăng nhập">
@@ -94,7 +117,7 @@ export default function LoginPage() {
           <Input 
             id="email" 
             type="email" 
-            placeholder="example@gmail.com" 
+            placeholder="" 
             {...register("email")}
             className={errors.email ? "border-red-500" : ""}
           />
