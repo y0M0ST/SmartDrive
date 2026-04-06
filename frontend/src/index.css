@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/* Định nghĩa các biến màu của dự án SmartDrive */
+@theme {
+  --color-primary: oklch(0.586 0.253 260.801); /* Màu xanh đặc trưng */
+  --font-sans: "Geist", ui-sans-serif, system-ui;
+  
+  /* Nếu Shadcn cần các biến này */
+  --radius-lg: 0.5rem;
+  --radius-md: calc(0.5rem - 2px);
+  --radius-sm: calc(0.5rem - 4px);
+}
+
+@custom-variant dark (&:is(.dark *));
+
+/* Các lớp base cần thiết */
+@layer base {
+  * {
+    @apply border-[#e2e8f0]; /* border-border */
+  }
+  body {
+    @apply bg-white text-[#0f172a] antialiased; /* bg-background text-foreground */
+  }
+}
