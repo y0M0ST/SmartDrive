@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiResponse } from '../../common/types/response';
 
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]).{8,}$/;
 
 const validatePasswordStrength = (
   password: string,
@@ -10,7 +10,7 @@ const validatePasswordStrength = (
   if (!passwordRegex.test(password)) {
     res.status(400).json({
       success: false,
-      message: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&)',
+      message: 'Mật khẩu phải có ít nhất 8 ký tự, gồm ít nhất 1 chữ hoa, 1 số và 1 ký tự đặc biệt như @, ! hoặc #',
       error: 'WEAK_PASSWORD'
     } as ApiResponse);
     return false;
@@ -108,6 +108,15 @@ export const validateResetPassword = (
       success: false,
       message: 'Vui lòng nhập đầy đủ thông tin',
       error: 'MISSING_FIELDS'
+    } as ApiResponse);
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email không đúng định dạng',
+      error: 'INVALID_EMAIL'
     } as ApiResponse);
   }
 

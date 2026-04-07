@@ -9,10 +9,10 @@ const router = Router();
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Login
+ *     summary: Dang nhap he thong
  *     tags: [Auth]
  *     x-displayName: Login
- *     description: ""
+ *     description: Su dung chung cho Super Admin, Agency Manager va tai xe. Dang nhap bang email/username email va mat khau.
  *     requestBody:
  *       required: true
  *       content:
@@ -43,7 +43,7 @@ router.post('/login', validateLogin, login);
  * @swagger
  * /api/auth/logout:
  *   post:
- *     summary: Logout
+ *     summary: Dang xuat he thong
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
@@ -59,8 +59,9 @@ router.post('/logout', authenticate, logout);
  * @swagger
  * /api/auth/change-password:
  *   put:
- *     summary: Change password
+ *     summary: Doi mat khau tai khoan dang nhap
  *     tags: [Auth]
+ *     description: Ap dung cho ca admin va tai xe. Sau khi doi mat khau thanh cong, token hien tai se bi vo hieu hoa va bat buoc dang nhap lai.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -94,8 +95,9 @@ router.put('/change-password', authenticate, validateChangePassword, changePassw
  * @swagger
  * /api/auth/forgot-password:
  *   post:
- *     summary: Forgot password - Send OTP to email
+ *     summary: Gui OTP quen mat khau
  *     tags: [Auth]
+ *     description: Ap dung cho ca admin va tai xe theo email dang nhap trong he thong.
  *     requestBody:
  *       required: true
  *       content:
@@ -119,8 +121,9 @@ router.post('/forgot-password', validateForgotPassword, forgotPassword);
  * @swagger
  * /api/auth/reset-password:
  *   post:
- *     summary: Reset password with OTP
+ *     summary: Dat lai mat khau bang OTP
  *     tags: [Auth]
+ *     description: Ap dung cho ca admin va tai xe. OTP co hieu luc 15 phut.
  *     requestBody:
  *       required: true
  *       content:

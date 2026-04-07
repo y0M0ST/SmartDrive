@@ -2,12 +2,21 @@ import fs from 'fs';
 import path from 'path';
 import pool from '../config/database';
 
+const resolveSchemaPath = (schemaFileName: string) => {
+  const candidatePaths = [
+    path.join(__dirname, schemaFileName),
+    path.resolve(__dirname, '../../src/scripts', schemaFileName),
+  ];
+
+  return candidatePaths.find((candidatePath) => fs.existsSync(candidatePath));
+};
+
 async function runMigration() {
   const finalSchemaFile = 'final_schema.sql';
-  const sqlPath = path.join(__dirname, finalSchemaFile);
+  const sqlPath = resolveSchemaPath(finalSchemaFile);
   const shouldReset = process.argv.includes('--reset') || process.env.RESET_DB === 'true';
 
-  if (!fs.existsSync(sqlPath)) {
+  if (!sqlPath) {
     throw new Error(`Khong tim thay file schema tong hop: ${finalSchemaFile}`);
   }
 

@@ -9,18 +9,32 @@ export const login = async (req: Request, res: Response) => {
     const result = await loginService(email, password);
 
     switch (result.code) {
-      case 'INVALID_CREDENTIALS':
-        return res.status(401).json({
+      case 'ACCOUNT_NOT_FOUND':
+        return res.status(404).json({
           success: false,
-          message: 'Email hoặc mật khẩu không chính xác',
-          error: 'INVALID_CREDENTIALS'
+          message: 'Tài khoản không tồn tại',
+          error: 'ACCOUNT_NOT_FOUND'
         } as ApiResponse);
 
-      case 'ACCOUNT_DISABLED':
+      case 'WRONG_PASSWORD':
+        return res.status(401).json({
+          success: false,
+          message: 'Sai mật khẩu, vui lòng thử lại!',
+          error: 'WRONG_PASSWORD'
+        } as ApiResponse);
+
+      case 'ACCOUNT_BLOCKED':
         return res.status(403).json({
           success: false,
-          message: 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin',
-          error: 'ACCOUNT_DISABLED'
+          message: 'Tài khoản của bạn đã bị khóa, vui lòng liên hệ Admin!',
+          error: 'ACCOUNT_BLOCKED'
+        } as ApiResponse);
+
+      case 'AGENCY_INACTIVE':
+        return res.status(403).json({
+          success: false,
+          message: 'Đại lý của bạn không còn hoạt động. Vui lòng liên hệ Super Admin',
+          error: 'AGENCY_INACTIVE'
         } as ApiResponse);
 
       default:
@@ -64,9 +78,7 @@ export const logout = (req: AuthRequest, res: Response) => {
 export const changePassword = async (req: AuthRequest, res: Response) => {
   try {
     const { old_password, new_password } = req.body;
-    const adminId = req.admin!.id;
-
-    const result = await changePasswordService(adminId, old_password, new_password);
+    const result = await changePasswordService(req.admin!, old_password, new_password);
 
     switch (result.code) {
       case 'NOT_FOUND':
@@ -84,9 +96,14 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
         } as ApiResponse);
 
       default:
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token) {
+          logoutService(token);
+        }
+
         return res.status(200).json({
           success: true,
-          message: 'Đổi mật khẩu thành công'
+          message: 'Đổi mật khẩu thành công, vui lòng đăng nhập lại'
         } as ApiResponse);
     }
 
@@ -109,7 +126,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       case 'EMAIL_NOT_FOUND':
         return res.status(404).json({
           success: false,
-          message: 'Email này không tồn tại trong hệ thống',
+          message: 'Email không tồn tại trong hệ thống. Vui lòng liên hệ Admin',
           error: 'EMAIL_NOT_FOUND'
         } as ApiResponse);
 

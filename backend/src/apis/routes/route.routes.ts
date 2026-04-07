@@ -1,58 +1,58 @@
 import { Router } from 'express';
-import { authenticate } from '../../common/middlewares/auth.middleware';
+import { authenticate, requireManagementAccess } from '../../common/middlewares/auth.middleware';
 import {
-  listRoutes,
-  getRouteById,
   createRoute,
-  updateRoute,
   deleteRoute,
+  getRouteById,
+  listRoutes,
+  updateRoute,
 } from './route.controller';
 import {
-  validateRouteId,
-  validateListRoutes,
   validateCreateRoute,
+  validateRouteId,
   validateUpdateRoute,
 } from './route.validator';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(requireManagementAccess);
 
 /**
  * @swagger
  * /api/routes:
  *   get:
- *     summary: Lấy danh sách tuyến đường
+ *     summary: Lay danh sach tuyen duong
  *     tags: [Routes]
- *     description: Cả super_admin và agency_manager đều xem được toàn bộ danh sách tuyến đường.
+ *     description: Lay toan bo danh sach tuyen duong trong he thong. Bao gom so luong chuyen di lien ket.
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, minimum: 1, default: 1 }
- *       - in: query
- *         name: limit
- *         schema: { type: integer, minimum: 1, default: 10 }
- *       - in: query
- *         name: search
- *         schema: { type: string }
- *         description: Tìm theo tên tuyến, điểm đi hoặc điểm đến
- *       - in: query
- *         name: is_active
- *         schema: { type: string, enum: ['true', 'false'] }
- *         description: Lọc theo trạng thái khai thác
  *     responses:
  *       200:
- *         description: Lấy danh sách tuyến đường thành công
+ *         description: Lay danh sach tuyen duong thanh cong
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Lay danh sach tuyen duong thanh cong
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/RouteResponse'
  */
-router.get('/', validateListRoutes, listRoutes);
+router.get('/', listRoutes);
 
 /**
  * @swagger
  * /api/routes/{id}:
  *   get:
- *     summary: Lấy chi tiết một tuyến đường
+ *     summary: Lay chi tiet tuyen duong
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
@@ -60,12 +60,28 @@ router.get('/', validateListRoutes, listRoutes);
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string, format: uuid }
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID tuyen duong
  *     responses:
  *       200:
- *         description: Lấy thông tin thành công
+ *         description: Lay thong tin tuyen duong thanh cong
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Lay thong tin tuyen duong thanh cong
+ *                 data:
+ *                   $ref: '#/components/schemas/RouteResponse'
  *       404:
- *         description: Không tìm thấy tuyến đường
+ *         description: Khong tim thay tuyen duong
  */
 router.get('/:id', validateRouteId, getRouteById);
 
@@ -73,9 +89,9 @@ router.get('/:id', validateRouteId, getRouteById);
  * @swagger
  * /api/routes:
  *   post:
- *     summary: Thêm tuyến đường mới
+ *     summary: Them tuyen duong moi
  *     tags: [Routes]
- *     description: Cả super_admin và agency_manager đều được tạo tuyến đường.
+ *     description: Tao moi tuyen duong. Trang thai mac dinh la "Dang khai thac" (is_active = true).
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -83,33 +99,27 @@ router.get('/:id', validateRouteId, getRouteById);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [name, origin, destination]
- *             properties:
- *               name:
- *                 type: string
- *                 example: Đà Nẵng - Huế
- *               origin:
- *                 type: string
- *                 example: Đà Nẵng
- *               destination:
- *                 type: string
- *                 example: Huế
- *               distance_km:
- *                 type: number
- *                 example: 105.5
- *                 description: Cự ly km, phải > 0
- *               estimated_duration_min:
- *                 type: integer
- *                 example: 150
- *                 description: Thời gian dự kiến (phút), phải > 0
+ *             $ref: '#/components/schemas/RoutePayload'
  *     responses:
  *       201:
- *         description: Thêm tuyến đường thành công
+ *         description: Them tuyen duong thanh cong
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Them tuyen duong thanh cong
+ *                 data:
+ *                   $ref: '#/components/schemas/RouteResponse'
  *       400:
- *         description: Điểm đi và điểm đến trùng nhau hoặc thiếu thông tin
+ *         description: Du lieu khong hop le
  *       409:
- *         description: Tên tuyến đường đã tồn tại
+ *         description: Ten tuyen duong da ton tai
  */
 router.post('/', validateCreateRoute, createRoute);
 
@@ -117,40 +127,45 @@ router.post('/', validateCreateRoute, createRoute);
  * @swagger
  * /api/routes/{id}:
  *   put:
- *     summary: Cập nhật tuyến đường
+ *     summary: Cap nhat tuyen duong
  *     tags: [Routes]
- *     description: |
- *       Cập nhật thông tin tuyến đường.
- *       Lưu ý: Không thể đặt `is_active = false` nếu tuyến đang có chuyến đi `scheduled` hoặc `active`.
+ *     description: Cap nhat thong tin tuyen duong. Co the doi trang thai sang "Tam ngung" (is_active = false).
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string, format: uuid }
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID tuyen duong
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:                   { type: string }
- *               origin:                 { type: string }
- *               destination:            { type: string }
- *               distance_km:            { type: number }
- *               estimated_duration_min: { type: integer }
- *               is_active:              { type: boolean }
+ *             $ref: '#/components/schemas/RoutePayload'
  *     responses:
  *       200:
- *         description: Cập nhật thành công
- *       400:
- *         description: Điểm đi và điểm đến trùng nhau
+ *         description: Cap nhat tuyen duong thanh cong
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Cap nhat tuyen duong thanh cong
+ *                 data:
+ *                   $ref: '#/components/schemas/RouteResponse'
  *       404:
- *         description: Không tìm thấy tuyến đường
+ *         description: Khong tim thay tuyen duong
  *       409:
- *         description: Tên tuyến trùng hoặc đang có lịch trình hoạt động
+ *         description: Ten tuyen duong da ton tai
  */
 router.put('/:id', validateRouteId, validateUpdateRoute, updateRoute);
 
@@ -158,26 +173,39 @@ router.put('/:id', validateRouteId, validateUpdateRoute, updateRoute);
  * @swagger
  * /api/routes/{id}:
  *   delete:
- *     summary: Xóa tuyến đường
+ *     summary: Xoa tuyen duong
  *     tags: [Routes]
- *     description: |
- *       Không thể xóa tuyến đang có chuyến đi `scheduled` hoặc `active`.
- *       Nếu tuyến đã có dữ liệu lịch sử (completed trips), cũng sẽ bị chặn.
- *       Khuyến nghị: Dùng `PUT /:id` để đặt `is_active = false` thay vì xóa.
+ *     description: Xoa tuyen duong. Chi xoa duoc khi tuyen chua co chuyen xe nao lien ket. Neu dang co lich trinh, hay chuyen sang Tam ngung thay vi xoa.
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string, format: uuid }
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID tuyen duong
  *     responses:
  *       200:
- *         description: Xóa thành công
+ *         description: Xoa tuyen duong thanh cong
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Xoa tuyen duong thanh cong
+ *                 data:
+ *                   $ref: '#/components/schemas/RouteDeleteResponse'
  *       404:
- *         description: Không tìm thấy tuyến đường
+ *         description: Khong tim thay tuyen duong
  *       409:
- *         description: Không thể xóa (đang có lịch trình hoặc dữ liệu lịch sử)
+ *         description: Tuyen duong dang co lich trinh hoat dong
  */
 router.delete('/:id', validateRouteId, deleteRoute);
 
