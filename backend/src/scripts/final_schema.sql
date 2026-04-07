@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   created_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_vehicles_plate   UNIQUE (license_plate),
-  CONSTRAINT chk_vehicles_status CHECK (status IN ('available','on_trip','maintenance','retired')), -- Fix
+  CONSTRAINT chk_vehicles_status CHECK (status IN ('available','on_trip','maintenance','retired')),
   CONSTRAINT chk_vehicles_seats  CHECK (seat_count > 0)
 );
 

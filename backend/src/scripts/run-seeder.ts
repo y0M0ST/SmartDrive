@@ -1,6 +1,11 @@
 import pool from '../config/database';
 import bcrypt from 'bcryptjs';
 
+const seedRoutes = [
+  { name: 'Da Nang - Ha Noi', origin: 'Da Nang', destination: 'Ha Noi', distanceKm: 780, estimatedDurationMin: 840 },
+  { name: 'Da Nang - TP.HCM', origin: 'Da Nang', destination: 'TP.HCM', distanceKm: 960, estimatedDurationMin: 1020 },
+];
+
 async function seed() {
   const client = await pool.connect();
   try {
@@ -11,7 +16,11 @@ async function seed() {
       `INSERT INTO agencies (code, name, address, contact_phone, status)
        VALUES ($1, $2, $3, $4, 'active')
        ON CONFLICT (code)
-       DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address, contact_phone = EXCLUDED.contact_phone
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         address = EXCLUDED.address,
+         contact_phone = EXCLUDED.contact_phone,
+         status = 'active'
        RETURNING id, name`,
       ['NHA_XE_DA_NANG', 'Nha xe Da Nang', 'Da Nang', '0905111111']
     );
@@ -20,7 +29,11 @@ async function seed() {
       `INSERT INTO agencies (code, name, address, contact_phone, status)
        VALUES ($1, $2, $3, $4, 'active')
        ON CONFLICT (code)
-       DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address, contact_phone = EXCLUDED.contact_phone
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         address = EXCLUDED.address,
+         contact_phone = EXCLUDED.contact_phone,
+         status = 'active'
        RETURNING id, name`,
       ['BEN_XE_TRUNG_TAM', 'Ben xe Trung Tam', 'Da Nang', '0905222222']
     );
@@ -31,10 +44,18 @@ async function seed() {
 
     const adminHash = await bcrypt.hash('Admin@123', 12);
     const adminRes = await client.query(`
-      INSERT INTO admins (email, password_hash, full_name, role, agency_id, created_by_admin_id)
-      VALUES ($1, $2, $3, 'super_admin', NULL, NULL)
+      INSERT INTO admins (email, password_hash, full_name, role, agency_id, created_by_admin_id, is_active, password_reset_token, password_reset_expires)
+      VALUES ($1, $2, $3, 'super_admin', NULL, NULL, TRUE, NULL, NULL)
       ON CONFLICT (email)
-      DO UPDATE SET password_hash = EXCLUDED.password_hash, full_name = EXCLUDED.full_name, role = EXCLUDED.role, agency_id = NULL, created_by_admin_id = NULL
+      DO UPDATE SET
+        password_hash = EXCLUDED.password_hash,
+        full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role,
+        agency_id = NULL,
+        created_by_admin_id = NULL,
+        is_active = TRUE,
+        password_reset_token = NULL,
+        password_reset_expires = NULL
       RETURNING id`,
       ['admin@smartdrive.vn', adminHash, 'Super Admin']
     );
@@ -43,19 +64,35 @@ async function seed() {
 
     const daNangManagerHash = await bcrypt.hash('Danang@123', 12);
     await client.query(`
-      INSERT INTO admins (email, password_hash, full_name, role, agency_id, created_by_admin_id)
-      VALUES ($1, $2, $3, 'agency_manager', $4, $5)
+      INSERT INTO admins (email, password_hash, full_name, role, agency_id, created_by_admin_id, is_active, password_reset_token, password_reset_expires)
+      VALUES ($1, $2, $3, 'agency_manager', $4, $5, TRUE, NULL, NULL)
       ON CONFLICT (email)
-      DO UPDATE SET password_hash = EXCLUDED.password_hash, full_name = EXCLUDED.full_name, role = EXCLUDED.role, agency_id = EXCLUDED.agency_id, created_by_admin_id = EXCLUDED.created_by_admin_id`,
+      DO UPDATE SET
+        password_hash = EXCLUDED.password_hash,
+        full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role,
+        agency_id = EXCLUDED.agency_id,
+        created_by_admin_id = EXCLUDED.created_by_admin_id,
+        is_active = TRUE,
+        password_reset_token = NULL,
+        password_reset_expires = NULL`,
       ['danang@smartdrive.vn', daNangManagerHash, 'Quan Ly Nha Xe Da Nang', daNangAgencyId, adminId]
     );
 
     const centralManagerHash = await bcrypt.hash('Trungtam@123', 12);
     await client.query(`
-      INSERT INTO admins (email, password_hash, full_name, role, agency_id, created_by_admin_id)
-      VALUES ($1, $2, $3, 'agency_manager', $4, $5)
+      INSERT INTO admins (email, password_hash, full_name, role, agency_id, created_by_admin_id, is_active, password_reset_token, password_reset_expires)
+      VALUES ($1, $2, $3, 'agency_manager', $4, $5, TRUE, NULL, NULL)
       ON CONFLICT (email)
-      DO UPDATE SET password_hash = EXCLUDED.password_hash, full_name = EXCLUDED.full_name, role = EXCLUDED.role, agency_id = EXCLUDED.agency_id, created_by_admin_id = EXCLUDED.created_by_admin_id`,
+      DO UPDATE SET
+        password_hash = EXCLUDED.password_hash,
+        full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role,
+        agency_id = EXCLUDED.agency_id,
+        created_by_admin_id = EXCLUDED.created_by_admin_id,
+        is_active = TRUE,
+        password_reset_token = NULL,
+        password_reset_expires = NULL`,
       ['trungtam@smartdrive.vn', centralManagerHash, 'Quan Ly Ben Xe Trung Tam', centralAgencyId, adminId]
     );
     console.log('Agency manager: danang@smartdrive.vn / Danang@123');
@@ -99,13 +136,20 @@ async function seed() {
     }
     console.log('5 xe khach da duoc tao');
 
-    await client.query(`
-      INSERT INTO routes (name, origin, destination, distance_km, estimated_duration_min)
-      VALUES
-        (N'Da Nang - Ha Noi', N'Da Nang', N'Ha Noi', 780, 840),
-        (N'Da Nang - TP.HCM', N'Da Nang', N'TP.HCM', 960, 1020)
-      ON CONFLICT DO NOTHING`
-    );
+    for (const route of seedRoutes) {
+      await client.query(
+        `INSERT INTO routes (name, origin, destination, distance_km, estimated_duration_min)
+         SELECT $1::varchar(200), $2::varchar(100), $3::varchar(100), $4::double precision, $5::integer
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM routes
+           WHERE name = $1::varchar(200)
+             AND origin = $2::varchar(100)
+             AND destination = $3::varchar(100)
+         )`,
+        [route.name, route.origin, route.destination, route.distanceKm, route.estimatedDurationMin]
+      );
+    }
     console.log('2 tuyen duong mau da duoc tao');
 
     await client.query('COMMIT');
