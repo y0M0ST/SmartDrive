@@ -1,0 +1,19 @@
+{
+  "name": "smartdrive",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:be": "npm run dev --workspace=backend",
+    "dev:fe": "npm run dev --workspace=frontend",
+    "dev": "concurrently \"npm run dev:be\" \"npm run dev:fe\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "sonner": "^2.0.7"
+  }
+}
