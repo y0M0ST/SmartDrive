@@ -4,4 +4,11 @@ dist/
 build/
 __pycache__/
 *.pyc
-backend
+venv
+run.md
+
+# Bỏ qua thùng rác và dữ liệu ngầm của AI
+ai_module/captured_alerts/
+ai_module/database/local_database.sqlite
+ai_module/local_database.sqlite
+
