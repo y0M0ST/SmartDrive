@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import axios from 'axios'; // THÊM DÒNG NÀY VÀO ĐẦU FILE
 // Định nghĩa kiểu dữ liệu cho Xe khách
 interface CoachData {
   id?: string;
@@ -84,21 +84,32 @@ const CoachModal: React.FC<CoachModalProps> = ({ isOpen, onClose, mode, initialD
     deviceId: '',
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      if (mode === 'edit' && initialData) {
-        setFormData(initialData);
-      } else {
-        setFormData({
-          licensePlate: '',
-          type: 'Khách',
-          capacity: 16,
-          status: 'Sẵn sàng',
-          deviceId: '',
-        });
-      }
+useEffect(() => {
+  if (isOpen) {
+    if (mode === 'edit' && initialData) {
+      // Rin phải gán thủ công từng trường để khớp với tên biến của Form
+      setFormData({
+        licensePlate: (initialData as any).license_plate || '',
+        type: (initialData as any).vehicle_type || 'Khách',
+        capacity: (initialData as any).seat_count || 16,
+        // Chuyển ngược từ mã BE sang tiếng Việt để hiện lên Select
+        status: (initialData as any).status === 'available' ? 'Sẵn sàng' : 
+                (initialData as any).status === 'on_trip' ? 'Đang chạy' : 
+                (initialData as any).status === 'maintenance' ? 'Bảo dưỡng' : 'Sẵn sàng',
+        deviceId: (initialData as any).device_id || '',
+      });
+    } else {
+      setFormData({
+        licensePlate: '',
+        type: 'Khách',
+        capacity: 16,
+        status: 'Sẵn sàng',
+        deviceId: '',
+      });
     }
-  }, [isOpen, mode, initialData]);
+    setErrors({});
+  }
+}, [isOpen, mode, initialData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -111,7 +122,7 @@ const CoachModal: React.FC<CoachModalProps> = ({ isOpen, onClose, mode, initialD
     const newErrors: Record<string, string> = {};
     
     // Regex chuẩn biển số VN: 2 số + 1 chữ + (có thể thêm 1 số) + dấu gạch ngang + 3 số + chấm + 2 số
-    const plateRegex = /^[0-9]{2}[A-Z]{1}[0-9]{0,1}-[0-9]{3}\.[0-9]{2}$/;
+    const plateRegex = /^[0-9]{2}[A-Z]{1,2}-[0-9]{3,5}(\.[0-9]{2})?$/i;
 
     if (!formData.licensePlate.trim()) {
       newErrors.licensePlate = 'Biển số xe không được bỏ trống';
@@ -124,66 +135,92 @@ const CoachModal: React.FC<CoachModalProps> = ({ isOpen, onClose, mode, initialD
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    
-    try {
-      const apiUrl = mode === 'edit' 
-        ? `http://localhost:5000/api/vehicles/${initialData?.id}` 
-        : `http://localhost:5000/api/vehicles`;
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!validateForm()) return;
+  
+  try {
+    const token = localStorage.getItem("access_token");
+    const apiUrl = mode === 'edit' 
+      ? `http://localhost:5000/api/vehicles/${initialData?.id}` 
+      : `http://localhost:5000/api/vehicles`;
 
-      // 1. Logic Ánh xạ Trạng thái (Map status sang tiếng Anh để BE hiểu)
-      const statusMapping: Record<string, string> = {
-        'Sẵn sàng': 'available',
-        'Đang chạy': 'on_trip',
-        'Bảo dưỡng': 'maintenance' // Xe 'maintenance' sẽ không hiện trong list phân công
-      };
+    const statusMapping: Record<string, string> = {
+      'Sẵn sàng': 'available',
+      'Đang chạy': 'on_trip',
+      'Bảo dưỡng': 'maintenance'
+    };
 
-      const bodyData: any = {
-        license_plate: formData.licensePlate,
-        brand: "Thaco",                      
-        model: formData.type,                 
-        seat_count: Number(formData.capacity),
-        vehicle_type: "Xe khách",             
-        status: statusMapping[formData.status] || 'available', // Ánh xạ ở đây
-        registration_expiry_date: "2026-12-31", 
-        insurance_expiry_date: "2026-12-31",
-        device_id: formData.deviceId.trim() || null, // Cột lưu mã Camera
-      };
+    const bodyData = {
+      // Dùng ID của dòng 3 trong bảng agencies bạn gửi (DN_B)
+      agency_id: "06106255-5978-4306-b948-2f85794641b5", 
+      license_plate: formData.licensePlate.trim().toUpperCase(), // Chữ hoa cho chuẩn biển số
+      brand: "Thaco", 
+      model: formData.type === 'Khách' ? 'Xe khách' : formData.type, 
+      seat_count: parseInt(formData.capacity.toString(), 10), // Ép kiểu int4 chuẩn
+      vehicle_type: "Xe khách", 
+      // Lấy từ mapping, nếu không có thì giữ nguyên (phòng trường hợp value đã là tiếng Anh)
+      status: statusMapping[formData.status] || formData.status, 
+      registration_expiry_date: "2026-12-31", 
+      insurance_expiry_date: "2026-12-31",
+      // Nếu mã camera trống hoặc là "N/A" thì gửi null để tránh lỗi UNIQUE
+      device_id: (formData.deviceId && formData.deviceId !== 'N/A') ? formData.deviceId.trim() : null, 
+    };
 
-      if (mode === 'add') {
-        bodyData.agency_id = "7876a31c-772c-473d-9d77-5f72393297a7"; 
+    console.log("DỮ LIỆU CHUẨN GỬI LÊN:", bodyData);
+
+    const response = await axios({
+      method: mode === 'edit' ? 'PUT' : 'POST',
+      url: apiUrl,
+      data: bodyData,
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
+    });
 
-      const response = await fetch(apiUrl, {
-        method: mode === 'edit' ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData),
-      });
-
-      if (response.ok) {
-        alert(`🎉 ${mode === 'add' ? 'Thêm mới' : 'Cập nhật'} xe thành công!`);
-        onClose();
-        window.location.reload(); 
-      } else {
-        const errorData = await response.json();
-        
-        // 2. Logic xử lý lỗi Trùng Camera hoặc Biển số (Test BE)
-        if (response.status === 409 || errorData.message?.includes('device_id')) {
-          alert("❌ Lỗi: Camera này đang được gắn trên xe khác, vui lòng gỡ liên kết trước!");
-        } 
-        else if (errorData.message?.includes('license_plate')) {
-          alert("❌ Lỗi: Biển số xe này đã tồn tại trong hệ thống!");
-        }
-        else {
-          alert("Lỗi Server: " + (errorData.message || "Kiểm tra lại dữ liệu"));
-        }
-      }
-    } catch (error) {
-      alert("❌ Lỗi kết nối Server!");
+    if (response.status === 200 || response.status === 201) {
+      alert(`🎉 ${mode === 'add' ? 'Thêm mới' : 'Cập nhật'} xe thành công!`);
+      onClose();
+      if (onConfirm) onConfirm(formData); 
     }
-  };
+  }  catch (error: any) {
+    console.error("Lỗi đầy đủ từ Axios:", error);
+
+    let errorMessage = "Kiểm tra lại dữ liệu hoặc kết nối Server";
+
+    if (error.response && error.response.data) {
+      const data = error.response.data;
+      const status = error.response.status;
+      
+      // Chuyển tất cả tin nhắn lỗi về chữ thường để so sánh cho chính xác
+      const detail = (data.message || data.error || "").toLowerCase();
+
+      if (status === 409) {
+        // So sánh từ khóa 'license' hoặc 'plate' (vì BE thường trả về license_plate)
+        if (detail.includes('license') || detail.includes('biển số')) {
+          errorMessage = "❌ Lỗi: Biển số xe này đã tồn tại trong hệ thống!";
+        } 
+        // So sánh từ khóa 'device' hoặc 'camera'
+        else if (detail.includes('device') || detail.includes('camera')) {
+          errorMessage = "❌ Lỗi: Mã Camera này đã được gắn cho xe khác!";
+        } 
+        else {
+          errorMessage = "❌ Dữ liệu bị trùng lặp trong hệ thống!";
+        }
+      } else if (status === 401) {
+        errorMessage = "❌ Hết hạn đăng nhập, vui lòng Login lại!";
+      } else {
+        errorMessage = "❌ Lỗi từ Server: " + (data.message || "Dữ liệu không hợp lệ");
+      }
+    } 
+    else if (error.request) {
+      errorMessage = "❌ Không nhận được phản hồi từ Server. Rin kiểm tra lại Port 5000 nhé!";
+    }
+
+    alert(errorMessage);
+  }
+};
 
   if (!isOpen) return null;
 

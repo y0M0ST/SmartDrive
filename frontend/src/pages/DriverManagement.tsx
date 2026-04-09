@@ -16,7 +16,7 @@ interface Driver {
   safety_score: number;   // Có thêm cột này trong DB nè Rin
 }
 
-const DriverManagement = ({ isDarkMode, setIsDarkMode }: any) => {
+const DriverManagement = () => {
   // --- THAY ĐỔI TẠI ĐÂY ---
   const [drivers, setDrivers] = useState<Driver[]>([]); // Khởi tạo mảng rỗng
   const [loading, setLoading] = useState(true); // Trạng thái đợi lấy dữ liệu
@@ -24,15 +24,22 @@ const DriverManagement = ({ isDarkMode, setIsDarkMode }: any) => {
   // Hàm này để gọi API lấy danh sách từ Backend
 const fetchDrivers = async () => {
   try {
-    const response = await axios.get('http://localhost:5000/api/drivers');
+    // 1. Lấy token từ localStorage (đã lưu khi login thành công)
+    const token = localStorage.getItem("access_token");
+
+    const response = await axios.get('http://localhost:5000/api/drivers', {
+      // 2. Gửi token kèm theo header "Authorization"
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
     
-    // Sửa dòng này: lấy thẳng response.data.data vì nó là mảng tài xế
-    const dataFromBE = response.data.data; 
+    // 3. Lấy dữ liệu (nhớ check cấu trúc response.data của bạn)
+    const dataFromBE = response.data.data || response.data;
     
-    console.log("Rin ơi, data thực tế đây:", dataFromBE);
     setDrivers(Array.isArray(dataFromBE) ? dataFromBE : []);
   } catch (error) {
-    console.error("Lỗi rồi Rin ơi:", error);
+    console.error("Lỗi 401 rồi, Token có vấn đề hoặc hết hạn!", error);
   } finally {
     setLoading(false);
   }
@@ -100,22 +107,23 @@ useEffect(() => {
   };
 
   // Tìm hàm handleConfirmDelete và sửa lại như sau:
-  const handleConfirmDelete = async () => {
-    if (driverToDelete) {
-      try {
-        // Gửi lệnh xóa lên Backend theo ID
-        await axios.delete(`http://localhost:5000/api/drivers/${driverToDelete.id}`);
-        
-        // Xóa xong thì gọi lại hàm lấy danh sách để cập nhật giao diện
-        fetchDrivers(); 
-        
-        setIsDeleteModalOpen(false);
-        setDriverToDelete(null);
-      } catch (error) {
-        alert("Không xóa được rồi , kiểm tra lại Backend nhé!");
-      }
+const handleConfirmDelete = async () => {
+  if (driverToDelete) {
+    try {
+      const token = localStorage.getItem("access_token");
+      await axios.delete(`http://localhost:5000/api/drivers/${driverToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert("Xóa thành công!");
+      fetchDrivers(); // Cập nhật lại UI
+      setIsDeleteModalOpen(false);
+    } catch (error: any) {
+      // US_05: Thông báo lỗi nếu tài xế đang thực hiện chuyến đi
+      const msg = error.response?.data?.message || "Lỗi xóa tài xế";
+      alert("⚠️ " + msg);
     }
-  };
+  }
+};
 if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-white text-blue-600 font-bold">
@@ -124,10 +132,14 @@ if (loading) {
     );
   }
 
-  const handleSuccess = () => {
-    setIsModalOpen(false); // Đóng modal
-    fetchDrivers(); // Gọi lại API để lấy data mới nhất từ DBeaver
-  };
+const handleSuccess = () => {
+  // 1. Tuyệt đối KHÔNG dùng window.location.reload()
+  // 2. Chỉ gọi hàm fetchDrivers để cập nhật State drivers
+  fetchDrivers();   
+  
+  // 3. Đóng modal (nếu DriverModal chưa tự đóng)
+  setIsModalOpen(false);
+};
 
   const isExpired = (expiryDate: string) => {
   if (!expiryDate) return false;
@@ -138,114 +150,8 @@ if (loading) {
 };
 
   return (
-    <div className={`flex h-screen font-sans antialiased overflow-hidden ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}`}>
-      
-      {/* --- SIDEBAR --- */}
-      <aside className={`w-[280px] flex flex-col h-full z-10 border-r ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
-        <div className="h-20 flex items-center px-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-lg shadow-blue-600/30">
-              <span className="text-sm tracking-wider">SD</span>
-            </div>
-            <span className="font-extrabold text-xl tracking-tight text-slate-900 italic">Safe Drive</span>
-          </div>
-        </div>
-
-        <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-            Dashboard
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-bold text-blue-700 bg-blue-50/80 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path strokeLinecap="round" strokeLinejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"/><path strokeLinecap="round" strokeLinejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Quản lí tài xế
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path strokeLinecap="round" strokeLinejoin="round" d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
-            Quản lí tuyến đường
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Quản lí chuyến đi
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="20" height="14" x="2" y="3" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            Lịch sử vi phạm
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v5h5"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l4 2"/></svg>
-            Đánh giá và xếp hạng
-          </button>
-          <button className="w-full flex items-center justify-start gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all text-left">
-            <svg 
-              className="w-5 h-5 text-slate-400 shrink-0" // shrink-0 giúp icon không bị bóp méo
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor" 
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <span className="text-left leading-tight">Thống kê thu nhập & báo cáo</span>
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path strokeLinecap="round" strokeLinejoin="round" d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
-            Quản lí tài khoản
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2m10 0a2 2 0 1 0 4 0a2 2 0 0 0-4 0zm-10 0a2 2 0 1 0 4 0a2 2 0 0 0-4 0z" /></svg>
-            Quản lí xe
-          </button>
-        </nav>
-
-        <div className="p-6">
-          <div className="bg-[#f8f9fc] rounded-2xl p-4 text-left border border-slate-100">
-            <h3 className="font-bold text-[11px] text-slate-800 tracking-wider uppercase">SAFE DRIVE SYSTEM</h3>
-            <p className="text-[10px] text-slate-400 mt-1 font-medium">Version: 1.0.0.11</p>
-          </div>
-        </div>
-      </aside>
-
-      {/* --- KHU VỰC NỘI DUNG CHÍNH --- */}
-      <main className="flex-1 flex flex-col h-full bg-[#fcfcfd] relative">
-        <header className={`h-20 flex items-center justify-between px-10 border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3 px-4 py-2 bg-[#f8fafc] rounded-full w-96 shadow-sm border border-slate-100">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input type="text" placeholder="Global search..." className="bg-transparent outline-none text-sm text-slate-500 placeholder-slate-400 w-full" readOnly />
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
-              <span>Theme</span>
-              {/* Thẻ cha (Cái rãnh nút gạt) */}
-                <div
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className={`w-10 h-5 rounded-full flex items-center p-0.5 cursor-pointer transition-all duration-300 ${
-                    isDarkMode ? 'bg-blue-600' : 'bg-slate-300'
-                  }`}
-                >
-                  {/* Thẻ con (Hình tròn trắng) */}
-                  <div 
-                    className="w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300"
-                    style={{
-                      transform: isDarkMode ? 'translateX(20px)' : 'translateX(0px)'
-                    }}
-                  ></div>
-                </div>
-            </div>
-            <div className="flex gap-4 text-slate-400">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 cursor-pointer hover:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 cursor-pointer hover:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-            </div>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-6 cursor-pointer">
-               <div className="w-8 h-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-400 bg-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
-               </div>
-               <span className="font-bold text-sm text-slate-800">Admin</span>
-            </div>
-          </div>
-        </header>
+    <div className="w-full">
+   
 
         <div className="flex-1 p-10 overflow-y-auto">
           <div className="max-w-7xl mx-auto bg-white min-h-[600px] flex flex-col justify-between rounded-2xl shadow-sm border-[1.5px] border-slate-800 overflow-hidden">
@@ -370,24 +276,23 @@ if (loading) {
         </div>
 
         {/* GỌI MODAL RA Ở ĐÂY, TRUYỀN DỮ LIỆU */}
-        <DriverModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          mode={modalMode} 
-          initialData={selectedDriver} 
-          onSuccess={handleSuccess} // Thêm dòng này (nhớ sửa cả code bên trong DriverModal nhé)
-        />
-        <ConfirmModal 
-          isOpen={isDeleteModalOpen}
-          onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleConfirmDelete}
-          title="Xóa tài xế"
-          message="Bạn có chắc chắn muốn xóa tài xế"
-          itemName={driverToDelete?.full_name || ""}
-        />
-        
-      </main>
-    </div>
+      <DriverModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        mode={modalMode} 
+        initialData={selectedDriver} 
+        onSuccess={handleSuccess} 
+      />
+      
+      <ConfirmModal 
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Xóa tài xế"
+        message="Bạn có chắc chắn muốn xóa tài xế"
+        itemName={driverToDelete?.full_name || ""}
+      />
+    </div> // Đây là thẻ đóng duy nhất của div ngoài cùng ở dòng 127
   );
 };
 

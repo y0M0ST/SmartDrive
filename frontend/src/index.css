@@ -1,3 +1,40 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Khai báo biến màu theo chuẩn v4 */
+  --color-primary: oklch(0.586 0.253 260.801);
+  
+  /* Khai báo các biến radius */
+  --radius-lg: 0.5rem;
+  --radius-md: calc(0.5rem - 2px);
+  --radius-sm: calc(0.5rem - 4px);
+  
+  /* Định nghĩa font */
+  --font-sans: "Geist", ui-sans-serif, system-ui;
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #0f172a;
+    --border: #e2e8f0;
+  }
+
+  .dark {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --border: #1e293b;
+  }
+
+  * {
+    @apply border-[--border];
+  }
+
+  body {
+    @apply bg-white text-[--foreground] antialiased;
+  }
+
+  .dark body {
+    @apply bg-slate-900 text-slate-50;
+  }
+}

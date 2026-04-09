@@ -14,27 +14,27 @@ interface Vehicle {
 }
 
 const VehicleManagement = ({ isDarkMode, setIsDarkMode }: any) => {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]); // Để mảng rỗng nè Rin
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]); 
   const [loading, setLoading] = useState(true);
 
   // --- HÀM LẤY DANH SÁCH XE ---
  const fetchVehicles = async () => {
   try {
     setLoading(true);
-    const response = await axios.get('http://localhost:5000/api/vehicles');
-    
-    // JSON của bạn bọc data trong response.data.data
+    const token = localStorage.getItem("access_token"); // 1. Lấy token
 
-    const dataBE = response.data.data || []; 
-    
-    setVehicles(dataBE);
+    const response = await axios.get('http://localhost:5000/api/vehicles', {
+      headers: { Authorization: `Bearer ${token}` } // 2. Gửi kèm headers
+    });
+
+    const dataBE = response.data.data || response.data; 
+    setVehicles(Array.isArray(dataBE) ? dataBE : []);
   } catch (error) {
-    console.error("Lỗi lấy danh sách xe:", error);
+    console.error("Lỗi 401:kiểm tra lại login nhé!", error);
   } finally {
     setLoading(false);
   }
 };
-
   useEffect(() => {
     fetchVehicles();
   }, []);
@@ -139,28 +139,25 @@ const handleModalConfirm = async (formData: any) => {
 const handleConfirmDelete = async () => {
   if (vehicleToDelete) {
     try {
-      const response = await axios.delete(`http://localhost:5000/api/vehicles/${vehicleToDelete.id}`);
+      const token = localStorage.getItem("access_token");
+      await axios.delete(`http://localhost:5000/api/vehicles/${vehicleToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      // Nếu xóa thành công
-      await fetchVehicles(); 
+      // TC_VEH_06: Xóa thành công
+      alert("🎉 Xóa xe thành công!");
+      await fetchVehicles(); // Load lại bảng ngay
       setIsConfirmOpen(false);
       setVehicleToDelete(null);
-      alert("🎉 Xóa xe thành công!");
-
     } catch (error: any) {
-      // --- LOGIC KIỂM TRA XE ĐANG CHẠY (TEST CASE RÀNG BUỘC) ---
-      const serverMessage = error.response?.data?.message || "";
-      
-      if (error.response?.status === 400 && 
-         (serverMessage.includes("on_trip") || serverMessage.includes("hành trình"))) {
-        
-        // Hiện thông báo đúng như yêu cầu Test Case
+      // TC_VEH_07: Xử lý lỗi khi xe đang chạy
+      const msg = error.response?.data?.message || "";
+      if (msg.includes("on_trip") || vehicleToDelete.status === 'on_trip') {
         alert("❌ Lỗi: Không thể xóa phương tiện đang trong hành trình!");
       } else {
-        alert("❌ Lỗi: Không thể xóa phương tiện đang trong hành trình!");
+        alert("❌ Lỗi: " + msg);
       }
-      
-      setIsConfirmOpen(false); // Đóng modal xác nhận sau khi báo lỗi
+      setIsConfirmOpen(false);
     }
   }
 };
@@ -171,124 +168,10 @@ const handleDeleteClick = (vehicle: Vehicle) => {
 
 
   return (
-    <div className={`flex h-screen font-sans antialiased overflow-hidden transition-colors duration-300 ${
-      isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'
-    }`}>
-      
-      {/* --- SIDEBAR (GIỮ NGUYÊN GIAO DIỆN GỐC) --- */}
-      <aside className={`w-[280px] flex flex-col h-full z-10 border-r transition-colors duration-300 ${
-        isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'
-      }`}>
-        <div className="h-20 flex items-center px-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-lg shadow-blue-600/30">
-              <span className="text-sm tracking-wider">SD</span>
-            </div>
-            <span className="font-extrabold text-xl tracking-tight text-slate-900 italic">Safe Drive</span>
-          </div>
-        </div>
-
-        <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-            Dashboard
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path strokeLinecap="round" strokeLinejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"/><path strokeLinecap="round" strokeLinejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Quản lí tài xế
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path strokeLinecap="round" strokeLinejoin="round" d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
-            Quản lí tuyến đường
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Quản lí chuyến đi
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="20" height="14" x="2" y="3" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            Lịch sử vi phạm
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path strokeLinecap="round" strokeLinejoin="round" d="M3 3v5h5"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l4 2"/></svg>
-            Đánh giá và xếp hạng
-          </button>
-          <button className="w-full flex items-center justify-start gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all text-left">
-            <svg 
-              className="w-5 h-5 text-slate-400 shrink-0" // shrink-0 giúp icon không bị bóp méo
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor" 
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <span className="text-left leading-tight">Thống kê thu nhập & báo cáo</span>
-          </button>
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path strokeLinecap="round" strokeLinejoin="round" d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
-            Quản lí tài khoản
-          </button>
-          {/* Quản lí xe (ACTIVE) */}
-          <button className="w-full flex items-center gap-4 px-4 py-3 text-[14px] font-bold text-blue-700 bg-blue-50/80 rounded-xl transition-all">
-            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2m10 0a2 2 0 1 0 4 0a2 2 0 0 0-4 0zm-10 0a2 2 0 1 0 4 0a2 2 0 0 0-4 0z" /></svg>
-            Quản lí xe
-          </button>
-        </nav>
-
-        <div className="p-6">
-          <div className="bg-[#f8f9fc] rounded-2xl p-4 text-left border border-slate-100">
-            <h3 className="font-bold text-[11px] text-slate-800 tracking-wider uppercase">SAFE DRIVE SYSTEM</h3>
-            <p className="text-[10px] text-slate-400 mt-1 font-medium">Version: 1.0.0.11</p>
-          </div>
-        </div>
-      </aside>
-
+    <div className="w-full transition-colors duration-300">
+    
       {/* --- KHU VỰC NỘI DUNG CHÍNH (GIỮ NGUYÊN GIAO DIỆN GỐC) --- */}
-      <main className="flex-1 flex flex-col h-full bg-[#fcfcfd]">
-        
-        <header className={`h-20 flex items-center justify-between px-10 border-b transition-colors duration-300 ${
-          isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-        }`}>
-          <div className="flex items-center gap-3 px-4 py-2 bg-[#f8fafc] rounded-full w-96 shadow-sm border border-slate-100 opacity-60 pointer-events-none">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input type="text" placeholder="Global search..." className="bg-transparent outline-none text-sm text-slate-500 placeholder-slate-400 w-full" readOnly />
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
-              <span>Theme</span>
-              {/* Thẻ cha (Cái rãnh nút gạt) */}
-                <div
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className={`w-10 h-5 rounded-full flex items-center p-0.5 cursor-pointer transition-all duration-300 ${
-                    isDarkMode ? 'bg-blue-600' : 'bg-slate-300'
-                  }`}
-                >
-                  {/* Thẻ con (Hình tròn trắng) */}
-                  <div 
-                    className="w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300"
-                    style={{
-                      transform: isDarkMode ? 'translateX(20px)' : 'translateX(0px)'
-                    }}
-                  ></div>
-                </div>
-            </div>
-            <div className="flex gap-4 text-slate-400">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 cursor-pointer hover:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 cursor-pointer hover:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-            </div>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-6 cursor-pointer">
-               <div className="w-8 h-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-400 bg-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
-               </div>
-               <span className="font-bold text-sm text-slate-800">Admin</span>
-            </div>
-          </div>
-        </header>
-
+      <div className="flex-1 flex flex-col bg-[#fcfcfd]"></div>
         <div className="flex-1 px-10 py-8 overflow-y-auto">
           
           <div className="flex justify-between items-center mb-6">
@@ -348,10 +231,10 @@ const handleDeleteClick = (vehicle: Vehicle) => {
                         isDarkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-200 text-slate-700'
                       }`}
                     >
-                      <option value="" className={isDarkMode ? 'bg-slate-800' : ''}>Trạng thái</option>
-                      <option value="available" className={isDarkMode ? 'bg-slate-800' : ''}>Sẵn sàng</option>
-                      <option value="on_trip" className={isDarkMode ? 'bg-slate-800' : ''}>Đang chạy</option>
-                      <option value="maintenance" className={isDarkMode ? 'bg-slate-800' : ''}>Bảo dưỡng</option>
+                      <option value="">Tất cả trạng thái</option>
+                      <option value="available">Sẵn sàng</option>
+                      <option value="on_trip">Đang chạy</option>
+                      <option value="maintenance">Bảo dưỡng</option>
                     </select>
                   </div>
                 </div>
@@ -376,15 +259,29 @@ const handleDeleteClick = (vehicle: Vehicle) => {
                     <th className="py-4 px-6 text-center">Hành động</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {currentVehicles.length > 0 ? (
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {loading ? (
+                    // --- 1. HIỆU ỨNG SKELETON KHI ĐANG LOAD ---
+                    [...Array(itemsPerPage)].map((_, i) => (
+                      <tr key={`skeleton-${i}`} className="h-14 animate-pulse">
+                        <td className="px-6 text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-8 mx-auto"></div></td>
+                        <td className="px-6"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32"></div></td>
+                        <td className="px-6"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24"></div></td>
+                        <td className="px-6 text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-10 mx-auto"></div></td>
+                        <td className="px-6 text-center"><div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-full w-24 mx-auto"></div></td>
+                        <td className="px-6"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-20"></div></td>
+                        <td className="px-6"><div className="h-8 bg-slate-100 dark:bg-slate-800 rounded-lg w-16 mx-auto"></div></td>
+                      </tr>
+                    ))
+                  ) : currentVehicles.length > 0 ? (
+                    // --- 2. DỮ LIỆU THẬT (GIỮ NGUYÊN NỘI DUNG CỦA RIN) ---
                     currentVehicles.map((v, index) => (
-                      <tr key={v.id} className="hover:bg-slate-50 transition-colors h-14 text-slate-600">
-                        <td className="px-6 text-center text-slate-500 font-medium">
+                      <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors h-14 text-slate-600 dark:text-slate-300">
+                        <td className="px-6 text-center text-slate-500 dark:text-slate-400 font-medium">
                           {(currentPage - 1) * itemsPerPage + index + 1}
                         </td>
                         
-                        <td className="px-6 font-bold text-blue-600 cursor-pointer uppercase">
+                        <td className="px-6 font-bold text-blue-600 dark:text-blue-400 cursor-pointer uppercase">
                           {v.license_plate}
                         </td>
 
@@ -400,9 +297,9 @@ const handleDeleteClick = (vehicle: Vehicle) => {
 
                         <td className="px-6 text-center">
                           <span className={`inline-flex px-3 py-1 rounded-full text-[12px] font-bold ${
-                            (v.status === 'available' || v.status === 'Sẵn sàng') ? 'bg-[#e6f7ee] text-[#00a65a]' : 
-                            (v.status === 'maintenance' || v.status === 'Bảo dưỡng') ? 'bg-orange-100 text-orange-600 border border-orange-200' : 
-                            'bg-blue-50 text-blue-600'
+                            (v.status === 'available' || v.status === 'Sẵn sàng') ? 'bg-[#e6f7ee] text-[#00a65a] dark:bg-green-900/30 dark:text-green-400' : 
+                            (v.status === 'maintenance' || v.status === 'Bảo dưỡng') ? 'bg-orange-100 text-orange-600 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-400' : 
+                            'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
                           }`}>
                             {
                               (v.status === 'available' || v.status === 'Sẵn sàng') ? 'Sẵn sàng' : 
@@ -412,23 +309,27 @@ const handleDeleteClick = (vehicle: Vehicle) => {
                           </span>
                         </td>
 
-                        <td className="px-6 text-slate-500 font-medium">
+                        <td className="px-6 text-slate-500 dark:text-slate-400 font-medium">
                           {v.device_id || 'N/A'}
                         </td>
 
-                        {/* ĐÂY LÀ Ô HÀNH ĐỘNG DUY NHẤT - KHÔNG ĐƯỢC LẶP */}
                         <td className="px-6 flex items-center justify-center gap-3 h-14">
-                          <button onClick={() => handleOpenEditModal(v)} className="text-amber-500 hover:text-amber-600" title="Sửa">
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          <button onClick={() => handleOpenEditModal(v)} className="text-amber-500 hover:text-amber-600 transition-transform hover:scale-110" title="Sửa">
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                           </button>
-                          <button onClick={() => handleDeleteClick(v)} className="text-slate-300 hover:text-red-500" title="Xóa">
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          <button onClick={() => handleDeleteClick(v)} className="text-slate-300 dark:text-slate-600 hover:text-red-500 transition-transform hover:scale-110" title="Xóa">
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                           </button>
                         </td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={7} className="py-16 text-center text-slate-500">Không tìm thấy xe nào.</td></tr>
+                    // --- 3. KHI KHÔNG CÓ DỮ LIỆU ---
+                    <tr>
+                      <td colSpan={7} className="py-16 text-center text-slate-500 dark:text-slate-400">
+                        Không tìm thấy xe nào.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -464,7 +365,7 @@ const handleDeleteClick = (vehicle: Vehicle) => {
           onClose={() => setIsModalOpen(false)} 
           mode={modalMode} 
           initialData={selectedCoach} 
-          onConfirm={handleModalConfirm} // <-- Đảm bảo cái này đúng tên prop bên trong Modal
+          onConfirm={() => fetchVehicles()  } // Thay đổi ở đây
         />
 
         {/* MODAL XÁC NHẬN XÓA */}
@@ -477,8 +378,7 @@ const handleDeleteClick = (vehicle: Vehicle) => {
           itemName={vehicleToDelete?.license_plate || ""}
         />
         
-      </main>
-    </div>
+      </div>
   );
 };
 

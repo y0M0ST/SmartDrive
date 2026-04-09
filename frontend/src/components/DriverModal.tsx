@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 // 1. COMPONENT INPUT & SELECT DÙNG CHUNG
 interface FloatingInputProps {
@@ -36,9 +37,10 @@ interface DriverModalProps {
   onClose: () => void;
   mode: 'add' | 'edit';
   initialData?: any;
+  onSuccess: () => void;
 }
 
-const DriverModal = ({ isOpen, onClose, mode, initialData }: DriverModalProps) => {
+const DriverModal = ({ isOpen, onClose, mode, initialData ,onSuccess}: DriverModalProps) => {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -52,113 +54,118 @@ const DriverModal = ({ isOpen, onClose, mode, initialData }: DriverModalProps) =
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (isOpen) {
-      if (mode === 'edit' && initialData) {
-        // Đổ dữ liệu từ hàng (Row) đang chọn vào các ô Input
-        setFormData({ 
-          ...initialData,
-          // Đảm bảo format ngày yyyy-MM-dd để ô input date hiểu được
-          expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : ''
-        });
-        setPreviewUrl(initialData.face_image_url || null);
-      } else {
-        // Reset form nếu là thêm mới
-        setFormData({ fullName: '', email: '', phone: '', licenseNumber: '', licenseClass: '', expiryDate: '', avatar: '', status: '' });
-        setPreviewUrl(null);
-      }
-      setErrors({});
-    }
-  }, [isOpen, mode, initialData]);
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // --- CHỈ KIỂM TRA LỖI KHI Ở CHẾ ĐỘ THÊM MỚI ---
-    if (mode === 'add') {
-      if (!formData.licenseNumber.trim()) newErrors.licenseNumber = 'Số hạng bằng lái không được bỏ trống';
-      if (!formData.fullName.trim()) newErrors.fullName = 'Họ và tên không được bỏ trống';
-      if (!formData.email.trim()) newErrors.email = 'Email không được bỏ trống';
-      if (!formData.phone.trim()) {
-        newErrors.phone = 'Số điện thoại không được bỏ trống';
-      } else if (!/^\d+$/.test(formData.phone.trim())) {
-        newErrors.phone = 'Số điện thoại chỉ được chứa chữ số';
-      }
-      if (!formData.status.trim()) newErrors.status = 'Vui lòng chọn trạng thái';
-      if (!previewUrl) {
-        newErrors.avatar = 'Bắt buộc phải có hình ảnh để hệ thống AI nhận diện';
-      }
-    }
-      
-    // --- CÁC TRƯỜNG DÙNG CHUNG (CẢ THÊM VÀ SỬA) ---
-    if (!formData.licenseClass.trim()) newErrors.licenseClass = 'Vui lòng chọn hạng bằng lái';
-    if (!formData.expiryDate.trim()) {
-      newErrors.expiryDate = 'Ngày hết hạn không được bỏ trống';
+useEffect(() => {
+  if (isOpen) {
+    if (mode === 'edit' && initialData) {
+      setFormData({
+        fullName: initialData.full_name || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        licenseNumber: initialData.license_number || '',
+        licenseClass: initialData.license_type || '', 
+        expiryDate: initialData.license_expiry_date ? initialData.license_expiry_date.split('T')[0] : '',
+        status: initialData.status || '',
+        avatar: initialData.face_image_url || ''
+      });
+      setPreviewUrl(initialData.face_image_url || null);
     } else {
-      const selectedDate = new Date(formData.expiryDate);
+      setFormData({ fullName: '', email: '', phone: '', licenseNumber: '', licenseClass: '', expiryDate: '', avatar: '', status: 'active' });
+      setPreviewUrl(null);
+    }
+    setErrors({});
+  }
+}, [isOpen, mode, initialData]);
+
+const validateForm = () => {
+  const newErrors: Record<string, string> = {};
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // --- CHỈ BẮT LỖI NHỮNG THỨ NÀY KHI THÊM MỚI ---
+  if (mode === 'add') {
+    if (!formData.fullName.trim()) newErrors.fullName = 'Họ và tên không được bỏ trống';
+    if (!formData.email.trim()) newErrors.email = 'Email không được bỏ trống';
+    if (!formData.phone.trim()) newErrors.phone = 'Số điện thoại không được bỏ trống';
+    if (!formData.licenseNumber.trim()) newErrors.licenseNumber = 'Số bằng lái không được bỏ trống';
+    if (!formData.status.trim()) newErrors.status = 'Vui lòng chọn trạng thái';
+    if (!previewUrl) {
+      newErrors.avatar = 'Bắt buộc phải có hình ảnh để hệ thống AI nhận diện';
+    }
+  }
+    
+  // --- CÁC TRƯỜNG LUÔN PHẢI VALIDATE (CẢ THÊM VÀ SỬA) ---
+  if (!formData.licenseClass.trim()) newErrors.licenseClass = 'Vui lòng chọn hạng bằng lái';
+  
+  if (!formData.expiryDate.trim()) {
+    newErrors.expiryDate = 'Ngày hết hạn không được bỏ trống';
+  } else {
+    const selectedDate = new Date(formData.expiryDate);
+    if (selectedDate <= today) {
+      newErrors.expiryDate = 'Ngày hết hạn phải là ngày trong tương lai';
+    }
+  }
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
+  // Tìm hàm handleSubmit và thay thế bằng đoạn này:
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!validateForm()) return;
+
+  try {
+    const token = localStorage.getItem("access_token");
+    const apiUrl = mode === 'edit' 
+      ? `http://localhost:5000/api/drivers/${initialData.id}` 
+      : `http://localhost:5000/api/drivers`;
+
+    // Gửi đúng tên trường Backend yêu cầu
+    const dataToSend = {
+      full_name: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      license_number: formData.licenseNumber,
+      license_type: formData.licenseClass,
+      license_expiry_date: formData.expiryDate,
+      status: formData.status || 'active',
+      face_image_url: previewUrl 
+    };
+
+    // BƯỚC 1: ĐỢI LƯU XONG
+    const res = await axios({
+      method: mode === 'edit' ? 'PUT' : 'POST',
+      url: apiUrl,
+      data: dataToSend,
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json' 
+      }
+    });
+
+    // BƯỚC 2: KIỂM TRA PHẢN HỒI THỰC TẾ TỪ SERVER
+    if (res.status === 200 || res.status === 201) {
+      alert(`🎉 Chúc mừng : Cập nhật thành công!`);
       
-      // Nếu ngày nhập vào nhỏ hơn hoặc bằng ngày hôm nay => Báo lỗi
-      if (selectedDate <= today) {
-        newErrors.expiryDate = 'Ngày hết hạn không hợp lệ (Phải là ngày trong tương lai)';
+      // BƯỚC 3: ĐÓNG MODAL TRƯỚC (QUAN TRỌNG)
+      onClose(); 
+
+      // BƯỚC 4: LOAD LẠI DATA SAU KHI MODAL ĐÃ ĐÓNG
+      if (onSuccess) {
+        // Dùng setTimeout cực ngắn để tách luồng xử lý hoàn toàn
+        setTimeout(() => {
+          onSuccess();
+        }, 10);
       }
     }
-    
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (validateForm()) {
-      try {
-        const apiUrl = mode === 'edit' 
-          ? `http://localhost:5000/api/drivers/${initialData.id}` 
-          : `http://localhost:5000/api/drivers`;
-
-        // Tạo object dữ liệu sạch để gửi đi
-        const dataToSend = {
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          license_number: formData.licenseNumber,
-          license_class: formData.licenseClass,
-          expiry_date: formData.expiryDate,
-          status: formData.status,
-          face_image_url: previewUrl // Gửi cái ảnh chân dung đang hiển thị
-        };
-
-        console.log("Dữ liệu thực tế gửi đi:", dataToSend);
-
-        const response = await fetch(apiUrl, {
-          method: mode === 'edit' ? 'PUT' : 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(dataToSend),
-        });
-
-        if (response.ok) {
-          alert(`Hệ thống: ${mode === 'edit' ? 'Cập nhật' : 'Thêm'} thành công!`);
-          onClose(); 
-          // Quan trọng: Đợi 1 chút cho DB kịp ghi rồi mới reload
-          setTimeout(() => {
-            window.location.reload();
-          }, 500); 
-        } else {
-          const errorData = await response.json();
-          alert("Lỗi từ Server: " + (errorData.message || "Không thể lưu"));
-        }
-
-      } catch (error) {
-        console.error("Lỗi kết nối:", error);
-        alert("Lỗi: Không kết nối được với Server. Rin kiểm tra xem Port 5000 đã chạy chưa?");
-      }
-    }
-  };
+  } catch (error: any) {
+    // CHỈ HIỆN LỖI NẾU API THẤT BẠI (400, 401, 500)
+    const serverMsg = error.response?.data?.message || "Lỗi: Dữ liệu không hợp lệ!";
+    alert("❌ Hệ thống báo: " + serverMsg);
+    console.error("Lỗi thật:", error);
+  }
+};
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
     if (errors[field]) setErrors({ ...errors, [field]: '' });
@@ -168,30 +175,23 @@ const DriverModal = ({ isOpen, onClose, mode, initialData }: DriverModalProps) =
   const [isDragging, setIsDragging] = useState(false); // Để đổi màu ô upload khi kéo ảnh vào
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFile = (file: File) => {
-    // 1. Kiểm tra định dạng (Chỉ cho phép jpg, jpeg, png)
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(file.type)) {
-      alert("❌ Lỗi: Chỉ chấp nhận định dạng .jpg, .png !");
-      return;
-    }
+const handleFile = (file: File) => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  const maxSize = 5 * 1024 * 1024;
 
-    // 2. Kiểm tra dung lượng (5MB = 5 * 1024 * 1024 bytes)
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      alert("❌ Lỗi: File quá lớn! Vui lòng chọn ảnh dưới 5MB.");
-      return;
-    }
+  if (!allowedTypes.includes(file.type) || file.size > maxSize) {
+    // TC_06: Popup đỏ khi sai định dạng hoặc quá 5MB
+    alert("❌ Chỉ chấp nhận định dạng .jpg, .png dưới 5MB");
+    return;
+  }
 
-    // 3. Nếu mọi thứ OK thì mới tiến hành Preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result as string);
-      setErrors({ ...errors, avatar: '' }); // Xóa lỗi đỏ nếu có
-    };
-    reader.readAsDataURL(file);
-    setSelectedFile(file); // Lưu file thật để gửi đi
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    setPreviewUrl(reader.result as string);
+    setErrors({ ...errors, avatar: '' }); 
   };
+  reader.readAsDataURL(file);
+};
 
   if (!isOpen) return null;
 
