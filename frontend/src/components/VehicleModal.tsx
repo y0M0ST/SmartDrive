@@ -27,7 +27,8 @@ const FormInput: React.FC<{
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   error?: string;
   placeholder?: string;
-}> = ({ label, name, value, onChange, error, placeholder = "" }) => (
+  disabled?: boolean; // Thêm dòng này
+}> = ({ label, name, value, onChange, error, placeholder = "", disabled = false }) => (
   <div className="mb-4">
     <label htmlFor={name} className="block text-sm font-bold text-slate-700 mb-1.5">{label}</label>
     <input
@@ -37,8 +38,10 @@ const FormInput: React.FC<{
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      // Sửa lại đoạn template string dưới đây
+      disabled={disabled} // Gán vào thuộc tính disabled của input
       className={`w-full px-4 py-2.5 border rounded-lg text-sm transition-all outline-none ${
+        disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : '' 
+      } ${
         error 
           ? 'border-red-500 bg-red-50 focus:ring-red-100' 
           : 'border-slate-200 focus:border-sky-400 text-slate-800'
@@ -87,18 +90,19 @@ const CoachModal: React.FC<CoachModalProps> = ({ isOpen, onClose, mode, initialD
 useEffect(() => {
   if (isOpen) {
     if (mode === 'edit' && initialData) {
-      // Rin phải gán thủ công từng trường để khớp với tên biến của Form
+      // Rin chú ý: initialData lấy từ bảng thường có tên là license_plate
       setFormData({
-        licensePlate: (initialData as any).license_plate || '',
-        type: (initialData as any).vehicle_type || 'Khách',
-        capacity: (initialData as any).seat_count || 16,
-        // Chuyển ngược từ mã BE sang tiếng Việt để hiện lên Select
+        licensePlate: (initialData as any).licensePlate || (initialData as any).license_plate || '',
+        type: (initialData as any).type || (initialData as any).vehicle_type || 'Khách',
+        capacity: (initialData as any).capacity || (initialData as any).seat_count || 16,
         status: (initialData as any).status === 'available' ? 'Sẵn sàng' : 
                 (initialData as any).status === 'on_trip' ? 'Đang chạy' : 
-                (initialData as any).status === 'maintenance' ? 'Bảo dưỡng' : 'Sẵn sàng',
-        deviceId: (initialData as any).device_id || '',
+                (initialData as any).status === 'maintenance' ? 'Bảo dưỡng' : 
+                ((initialData as any).status || 'Sẵn sàng'),
+        deviceId: (initialData as any).deviceId || (initialData as any).device_id || '',
       });
     } else {
+      // Khi thêm mới thì reset trắng hết
       setFormData({
         licensePlate: '',
         type: 'Khách',
@@ -247,7 +251,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <FormInput 
                 label="Biển số xe" 
                 name="licensePlate" 
-                value={formData.licensePlate || ''}
+                value={formData.licensePlate || ''} // Đảm bảo lấy từ state formData
                 onChange={handleInputChange} 
                 error={errors.licensePlate}
                 placeholder="Ví dụ: 92C1-123.45"
