@@ -1,0 +1,1 @@
+{"version":3,"file":"province.dto.js","sourceRoot":"","sources":["../../../src/apis/provinces/province.dto.ts"],"names":[],"mappings":";;;AAAA,6BAAwB;AAEX,QAAA,uBAAuB,GAAG,OAAC,CAAC,MAAM,CAAC;IAC5C,KAAK,EAAE,OAAC,CAAC,MAAM,CAAC;QACZ,MAAM,EAAE,OAAC,CAAC,MAAM,EAAE,CAAC,QAAQ,EAAE;KAChC,CAAC;CACL,CAAC,CAAC"}
