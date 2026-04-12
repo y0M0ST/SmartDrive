@@ -22,7 +22,7 @@ const ConfirmModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-[400px] max-w-[95%] overflow-hidden animate-fade-in-up p-6">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[400px] max-w-[95%] overflow-hidden animate-fade-in-up p-6">
         
         {/* Phần Icon cảnh báo & Nội dung */}
         <div className="flex flex-col items-center text-center">
@@ -32,9 +32,9 @@ const ConfirmModal = ({
             </svg>
           </div>
           
-          <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-          <p className="text-sm text-gray-500">
-            {message} <span className="font-semibold text-gray-800">"{itemName}"</span>? Hành động này không thể hoàn tác.
+          <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-2">{title}</h3>
+          <p className="text-sm text-gray-500 dark:text-slate-400">
+            {message} <span className="font-semibold text-gray-800 dark:text-slate-200">"{itemName}"</span>? Hành động này không thể hoàn tác.
           </p>
         </div>
 
@@ -42,7 +42,7 @@ const ConfirmModal = ({
         <div className="mt-8 flex justify-end gap-3 w-full">
           <button 
             onClick={onClose} 
-            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-slate-200 bg-gray-100 dark:bg-slate-800 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
           >
             Hủy
           </button>

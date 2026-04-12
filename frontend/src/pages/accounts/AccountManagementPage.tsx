@@ -1,387 +1,803 @@
-// import React, { useState, useEffect } from 'react';
-// import { adminApi } from "@/services/adminApi";
-// import { toast } from "sonner";
-// import { 
-//   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
-// } from "@/components/ui/table";
-// import { Button } from "@/components/ui/button";
-// import { Card, CardContent } from "@/components/ui/card";
-// import { Badge } from "@/components/ui/badge";
-// import { 
-//   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription 
-// } from "@/components/ui/dialog";
-// import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label";
-// import { 
-//   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
-// } from "@/components/ui/select";
-// import * as Icons from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { adminApi } from "@/services/adminApi";
+import { toast } from "sonner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import * as Icons from "lucide-react";
+import { AxiosError } from "axios";
+import { Link } from "react-router-dom";
 
-// export default function AccountManagementPage() {
-//   const [accounts, setAccounts] = useState<any[]>([]);
-//   const [loading, setLoading] = useState(false);
-//   const [searchQuery, setSearchQuery] = useState("");
-  
-//   // Quản lý Master-Detail
-//   const [selectedAgency, setSelectedAgency] = useState<any>(null);
-//   const [drivers, setDrivers] = useState<any[]>([]);
-//   const [loadingDrivers, setLoadingDrivers] = useState(false);
+const PAGE_SIZE = 10;
+const FILTER_ALL = "__all__";
 
-//   // Dialog states
-//   const [isDialogOpen, setIsDialogOpen] = useState(false);
-//   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-//   const [editingAccount, setEditingAccount] = useState<any>(null);
-//   const [accountToDelete, setAccountToDelete] = useState<any>(null);
+type UserStatus = "ACTIVE" | "INACTIVE" | "BLOCKED";
 
-//   // 1. Lấy thông tin user an toàn
-//   const userInfo = JSON.parse(localStorage.getItem("user_info") || "{}");
-//   const isSuperAdmin = userInfo.role === "super_admin";
-//   const myAgencyId = userInfo.agency_id || userInfo.id; // Chốt chặn lấy ID
+interface RoleItem {
+  id: string;
+  name: string;
+  description?: string;
+}
 
-//   const [formData, setFormData] = useState({
-//     full_name: '', 
-//     email: '', 
-//     phone: '', // Thêm dòng này
-//     role: 'driver', 
-//     agency_id: '', 
-//     is_active: true
-//   });
+interface UserItem {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  status: UserStatus;
+  agency_id: string | null;
+  role?: { id: string; name: string };
+}
 
-//   const fetchAccounts = async () => {
-//     setLoading(true);
-//     try {
-//       const res = await adminApi.getList({ search: searchQuery });
-//       const data = res.data?.data || res.data;
-//       setAccounts(Array.isArray(data) ? data : []);
-//     } catch (error) {
-//       toast.error("Không thể tải danh sách");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+interface ListMeta {
+  total: number;
+  currentPage: number;
+  totalPages: number;
+}
 
-//   const fetchDriversByAgency = async (agency: any) => {
-//     setSelectedAgency(agency);
-//     setLoadingDrivers(true);
-//     try {
-//       const idToQuery = agency.agency_id || agency.id;
-//       const res = await adminApi.getDrivers({ agency_id: idToQuery });
-//       const data = res.data?.data || res.data;
-//       setDrivers(Array.isArray(data) ? data : []);
-//     } catch (error) {
-//       toast.error("Lỗi tải tài xế");
-//     } finally {
-//       setLoadingDrivers(false);
-//     }
-//   };
+interface SessionUser {
+  id?: string;
+  role?: string;
+  agency_id?: string | null;
+}
 
-//   useEffect(() => {
-//     if (userInfo.role === 'agency_manager' && !selectedAgency) {
-//       setSelectedAgency(userInfo);
-//       fetchDriversByAgency(userInfo);
-//     } else if (!selectedAgency) {
-//       fetchAccounts();
-//     }
-//   }, [searchQuery, selectedAgency]);
+/** Khớp BE: Agency Admin chỉ được tạo tài xế. */
+const CREATABLE_BY_AGENCY_ADMIN = new Set(["DRIVER"]);
+/** Super Admin chỉ được tạo Quản lý nhà xe qua trang này. */
+const CREATABLE_BY_SUPER_ADMIN = new Set(["AGENCY_ADMIN"]);
 
-//   // --- FIX DỨT ĐIỂM HÀM LƯU ---
-//   const handleSave = async () => {
-//     if (!formData.full_name || !formData.email) {
-//       toast.error("Nhập đầy đủ tên và email");
-//       return;
-//     }
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof AxiosError) {
+    const msg = error.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+  }
+  return fallback;
+}
 
-//     setLoading(true);
-//     try {
-//       // Ưu tiên lấy ID: 1. Từ Agency đang được chọn | 2. Từ thông tin người đăng nhập
-//       const finalAgencyId = selectedAgency?.agency_id || selectedAgency?.id || myAgencyId;
+function roleBadgeLabel(roleName?: string): string {
+  switch (roleName) {
+    case "SUPER_ADMIN":
+      return "Chủ hệ thống";
+    case "AGENCY_ADMIN":
+      return "Quản lý nhà xe";
+    case "DISPATCHER":
+      return "Điều phối";
+    case "DRIVER":
+      return "Tài xế";
+    case "VIEWER":
+      return "Người xem";
+    default:
+      return roleName || "—";
+  }
+}
 
-//       if (formData.role === 'driver') {
-//         if (!finalAgencyId) {
-//           toast.error("Hệ thống chưa xác định được Agency ID!");
-//           setLoading(false);
-//           return;
-//         }
+function roleSelectLabel(roleName: string): string {
+  return roleBadgeLabel(roleName);
+}
 
-//         // BƯỚC 1: TẠO DRIVER
-// const drRes = await adminApi.createDriverProfile({
-//     full_name: formData.full_name,
-//   agency_id: finalAgencyId,
-//   phone: formData.phone || `0${Math.floor(100000000 + Math.random() * 900000000)}`, // Nếu trống thì tạo số ngẫu nhiên để tránh trùng DB
-//   status: "active"
-// });
+function statusDisplay(status: UserStatus): { label: string; className: string } {
+  switch (status) {
+    case "ACTIVE":
+      return {
+        label: "Hoạt động",
+        className:
+          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      };
+    case "BLOCKED":
+      return {
+        label: "Đã khóa",
+        className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      };
+    case "INACTIVE":
+      return {
+        label: "Không hoạt động",
+        className:
+          "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+      };
+    default:
+      return {
+        label: status,
+        className: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+      };
+  }
+}
 
-//         // BƯỚC 2: TẠO ACCOUNT
-//         await adminApi.createDriverAccount({
-//           driver_id: drRes.data?.data?.id,
-//           email: formData.email
-//         });
-//         toast.success("Đã tạo tài xế thành công!");
-//       } else {
-//         await adminApi.create({ ...formData, agency_id: finalAgencyId });
-//         toast.success("Tạo quản trị viên thành công!");
-//       }
+export default function AccountManagementPage() {
+  const userInfo = useMemo((): SessionUser => {
+    try {
+      return JSON.parse(localStorage.getItem("user_info") || "{}") as SessionUser;
+    } catch {
+      return {};
+    }
+  }, []);
 
-//       setIsDialogOpen(false);
-//       selectedAgency ? fetchDriversByAgency(selectedAgency) : fetchAccounts();
-//     } catch (error: any) {
-//       toast.error(error.response?.data?.message || "Lỗi khi lưu dữ liệu (500)");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+  const isSuperAdmin = userInfo.role === "SUPER_ADMIN";
+  const userAgencyId = userInfo.agency_id ?? null;
 
-// const confirmDelete = async () => {
-//   if (!accountToDelete) return;
+  const [accounts, setAccounts] = useState<UserItem[]>([]);
+  const [meta, setMeta] = useState<ListMeta>({
+    total: 0,
+    currentPage: 1,
+    totalPages: 0,
+  });
+  const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-//   setLoading(true);
-//   try {
-//     if (accountToDelete.role === 'driver') {
-//       // Gọi API xóa tài xế
-//       await adminApi.deleteDriver(accountToDelete.id);
-//     } else {
-//       // Gọi API xóa Admin/Agency
-//       await adminApi.delete(accountToDelete.id);
-//     }
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>(FILTER_ALL);
+  const [statusFilter, setStatusFilter] = useState<string>(FILTER_ALL);
 
-//     toast.success(`Đã xóa tài khoản ${accountToDelete.full_name || accountToDelete.username}`);
-    
-//     // Load lại danh sách tương ứng
-//     selectedAgency ? fetchDriversByAgency(selectedAgency) : fetchAccounts();
-//   } catch (error: any) {
-//     toast.error(error.response?.data?.message || "Xóa thất bại (500)");
-//   } finally {
-//     setLoading(false);
-//     setIsDeleteConfirmOpen(false);
-//     setAccountToDelete(null);
-//   }
-// };const handleEdit = (acc: any) => {
-//   setEditingAccount(acc);
-//   setFormData({
-//     full_name: acc.full_name || '',
-//     email: acc.email || acc.username || '',
-//     phone: acc.phone || '', // THÊM DÒNG NÀY
-//     role: acc.role,
-//     agency_id: acc.agency_id || '',
-//     is_active: acc.is_active
-//   });
-//   setIsDialogOpen(true);
-// };  
-// const toggleStatus = async (acc: any) => {
-//   // Chốt chặn bảo mật: Không cho Agency tự khóa chính mình hoặc khóa Super Admin
-//   if (acc.id === userInfo.id) {
-//     toast.error("Bạn không thể tự khóa chính mình!");
-//     return;
-//   }
-//   if (acc.role === 'super_admin' && !isSuperAdmin) {
-//     toast.error("Bạn không có quyền tác động đến Super Admin!");
-//     return;
-//   }
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<UserItem | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<UserItem | null>(null);
+  const [saving, setSaving] = useState(false);
 
-//   try {
-//     const newStatus = !acc.is_active;
-    
-//     // Gọi API update (Dùng chung hàm update của adminApi)
-//     await adminApi.update(acc.id, { is_active: newStatus });
-    
-//     toast.success(`Đã ${newStatus ? 'kích hoạt' : 'khóa'} tài khoản ${acc.full_name || acc.username}`);
-    
-//     // Load lại data
-//     selectedAgency ? fetchDriversByAgency(selectedAgency) : fetchAccounts();
-//   } catch (error: any) {
-//     toast.error("Cập nhật trạng thái thất bại");
-//   }
-// };
-//   return (
-//     <div className="space-y-6 p-4">
-//       {/* HEADER */}
-//       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-//         <div className="flex items-center gap-3">
-//           {selectedAgency && isSuperAdmin && (
-//             <Button variant="ghost" size="icon" onClick={() => setSelectedAgency(null)} className="rounded-full">
-//               <Icons.ChevronLeft size={24} />
-//             </Button>
-//           )}
-//           <div>
-//             <h1 className="text-3xl font-black text-slate-800 tracking-tight">
-//               {selectedAgency ? `Tài xế: ${selectedAgency.full_name}` : "Quản lý Tài khoản"}
-//             </h1>
-//           </div>
-//         </div>
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    role_id: "",
+    agency_id: "",
+  });
 
-//         <div className="flex items-center gap-3 w-full md:w-auto">
-//           <div className="relative flex-1 md:w-80">
-//             <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-//             <Input 
-//               className="pl-10 rounded-xl" 
-//               placeholder="Tìm kiếm..." 
-//               value={searchQuery}
-//               onChange={(e) => setSearchQuery(e.target.value)}
-//             />
-//           </div>
-          
-//           {/* NÚT THÊM MỚI HIỆN Ở ĐÂY CHO CẢ ADMIN VÀ AGENCY */}
-//           {(isSuperAdmin || selectedAgency) && (
-//             <Button 
-//               onClick={() => {
-//                 setEditingAccount(null);
-//               setFormData({
-//   full_name: '', 
-//   email: '', 
-//   phone: '', // BẮT BUỘC THÊM DÒNG NÀY ĐỂ FIX LỖI 2345
-//   role: selectedAgency ? 'driver' : 'agency_manager', 
-//   agency_id: selectedAgency?.agency_id || selectedAgency?.id || '', 
-//   is_active: true
-// });
-//                 setIsDialogOpen(true);
-//               }} 
-//               className="bg-blue-600 hover:bg-blue-700 font-bold rounded-xl shadow-lg"
-//             >
-//               <Icons.Plus className="mr-2 h-5 w-5" /> 
-//               {selectedAgency ? "Thêm tài xế" : "Thêm nhà xe"}
-//             </Button>
-//           )}
-//         </div>
-//       </div>
+  const rolesForForm = useMemo(() => {
+    if (isSuperAdmin) return roles.filter((r) => CREATABLE_BY_SUPER_ADMIN.has(r.name));
+    return roles.filter((r) => CREATABLE_BY_AGENCY_ADMIN.has(r.name));
+  }, [roles, isSuperAdmin]);
 
-//       <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
-//         <CardContent className="p-0">
-//           <Table>
-//             <TableHeader className="bg-slate-50">
-//               <TableRow>
-//                 <TableHead className="w-16 text-center font-bold">STT</TableHead>
-//                 <TableHead className="font-bold">Họ và tên</TableHead>
-//                 <TableHead className="font-bold">{selectedAgency ? "Username/Email" : "Email"}</TableHead>
-//                 <TableHead className="font-bold">Vai trò</TableHead>
-//                 <TableHead className="text-center font-bold">Hành động</TableHead>
-//               </TableRow>
-//             </TableHeader>
-//             <TableBody>
-//               {(selectedAgency ? drivers : accounts).map((acc, index) => (
-//                 <TableRow key={acc.id} className="hover:bg-slate-50/50 transition-colors">
-//                   <TableCell className="text-center font-medium text-slate-500">{index + 1}</TableCell>
-//                   <TableCell className="font-bold text-slate-800">{acc.full_name}</TableCell>
-//                   <TableCell className="text-slate-500">{acc.email || acc.username}</TableCell>
-//                   <TableCell>
-//                     <Badge variant="outline" className={`rounded-lg font-bold ${
-//                       acc.role === 'super_admin' ? "text-purple-700" :
-//                       acc.role === 'agency_manager' ? "text-blue-700" : "text-orange-700"
-//                     }`}>
-//                       {acc.role === 'super_admin' ? 'Chủ hệ thống' : acc.role === 'agency_manager' ? 'Đại lý' : 'Tài xế'}
-//                     </Badge>
-//                   </TableCell>
-//                   <TableCell className="text-center">
-//                     <div className="flex justify-center gap-1">
-//                       {acc.role === 'agency_manager' && !selectedAgency && (
-//                         <Button variant="ghost" size="icon" onClick={() => fetchDriversByAgency(acc)}>
-//                           <Icons.Users className="h-4 w-4 text-blue-600" />
-//                         </Button>
-//                       )}
-//                       {/* ... Các nút edit/delete khác ... */}
-//                     </div>
-//                   </TableCell>
-//                 </TableRow>
-//               ))}
-//             </TableBody>
-//           </Table>
-//         </CardContent>
-//       </Card>
-//       {/* MODAL THÊM/SỬA */}
+  /** Khi sửa, luôn hiển thị được role hiện tại (có thể là bản ghi cũ / test). */
+  const rolesForSelect = useMemo(() => {
+    if (!editingAccount?.role?.id) return rolesForForm;
+    const cur = roles.find((r) => r.id === editingAccount.role?.id);
+    if (!cur) return rolesForForm;
+    if (rolesForForm.some((r) => r.id === cur.id)) return rolesForForm;
+    return [...rolesForForm, cur];
+  }, [editingAccount, roles, rolesForForm]);
 
-// <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-//   <DialogContent className="sm:max-w-[450px] rounded-3xl p-0 overflow-hidden border-none shadow-2xl bg-white">
-    
-//     <DialogHeader className="p-5 pb-4 bg-slate-50 border-b border-slate-100">
-//       <DialogTitle className="text-xl font-black text-slate-800 tracking-tight">
-//         {editingAccount ? 'Cập nhật tài khoản' : 'Thêm tài khoản mới'}
-//       </DialogTitle>
-//     </DialogHeader>
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const next = searchInput.trim();
+      setDebouncedSearch((prev) => (prev === next ? prev : next));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
 
-//     <div className="p-6 pt-4 space-y-4"> 
-      
-//       {/* Cặp Label + Input Họ tên */}
-//       <div className="space-y-1">
-//         <Label className="font-bold text-slate-700 ml-1 text-sm">Họ và tên *</Label>
-//         <Input 
-//           value={formData.full_name} 
-//           onChange={e => setFormData({...formData, full_name: e.target.value})} 
-//           className="h-11 rounded-xl border-slate-200 focus:ring-blue-100" 
-//           placeholder="Nhập họ tên đầy đủ" 
-//         />
-//       </div>
+  const prevDebouncedSearch = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevDebouncedSearch.current === null) {
+      prevDebouncedSearch.current = debouncedSearch;
+      return;
+    }
+    if (prevDebouncedSearch.current === debouncedSearch) return;
+    prevDebouncedSearch.current = debouncedSearch;
+    setPage(1);
+  }, [debouncedSearch]);
 
-//       {/* Cặp Label + Input Email */}
-//       <div className="space-y-1">
-//         <Label className="font-bold text-slate-700 ml-1 text-sm">Email *</Label>
-//         <Input 
-//           type="email" 
-//           value={formData.email} 
-//           onChange={e => setFormData({...formData, email: e.target.value})} 
-//           className="h-11 rounded-xl border-slate-200" 
-//           placeholder="user@smartdrive.vn" 
-//         />
-//       </div>
-//         {/* Thêm ô Số điện thoại */}
-// <div className="space-y-1">
-//   <Label className="font-bold text-slate-700 ml-1 text-sm">Số điện thoại *</Label>
-//   <Input 
-//     value={formData.phone} 
-//     onChange={e => setFormData({...formData, phone: e.target.value})} 
-//     className="h-11 rounded-xl border-slate-200" 
-//     placeholder="0912xxxxxx" 
-//   />
-// </div>
-//       {/* Cặp Label + Select Role */}
-//       <div className="space-y-1">
-//         <Label className="font-bold text-slate-700 ml-1 text-sm">Vai trò (Role) *</Label>
-//         <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
-//           <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white">
-//             <SelectValue placeholder="Chọn vai trò" />
-//           </SelectTrigger>
-          
-//           <SelectContent 
-//             position="popper" 
-//             sideOffset={4} 
-//             className="bg-white border border-slate-200 rounded-xl shadow-xl p-1 z-[9999] w-[var(--radix-select-trigger-width)]"
-//           >
-//   <SelectItem value="agency_manager">Agency Manager</SelectItem>
-//   {/* THÊM DÒNG NÀY */}
-//   <SelectItem value="driver">Tài xế </SelectItem>
-//           </SelectContent>
-//         </Select>
-//       </div>
-//     </div>
+  const fetchAccounts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string | number> = {
+        page,
+        limit: PAGE_SIZE,
+      };
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (roleFilter !== FILTER_ALL) params.role_id = roleFilter;
+      if (statusFilter !== FILTER_ALL) params.status = statusFilter;
+      if (!isSuperAdmin && userAgencyId) {
+        params.agency_id = userAgencyId;
+      }
 
-//     {/* Footer: Dùng p-6 và h-11 để nút bấm cân đối */}
-//     <DialogFooter className="p-6 pt-2 flex items-center gap-3">
-//       <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="font-bold text-slate-500 rounded-xl">
-//         Hủy
-//       </Button>
-//       <Button onClick={handleSave} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-11 shadow-lg shadow-blue-100">
-//         {editingAccount ? 'Lưu thay đổi' : 'Tạo tài khoản'}
-//       </Button>
-//     </DialogFooter>
-//   </DialogContent>
-// </Dialog>
+      const res = await adminApi.getList(params);
+      const payload = res.data?.data as
+        | { data?: UserItem[]; meta?: Partial<ListMeta> }
+        | undefined;
 
-//       {/* MODAL XÁC NHẬN XÓA */}
-//       <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-//         <DialogContent className="sm:max-w-[400px] rounded-3xl p-8 bg-white dark:bg-slate-900 border-none shadow-2xl">
-//           <div className="text-center space-y-4">
-//             <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto">
-//               <Icons.Trash2 className="text-red-500 w-8 h-8" />
-//             </div>
-//             <DialogTitle className="text-xl font-black text-slate-800 dark:text-white">Xác nhận xóa tài khoản?</DialogTitle>
-//             <DialogDescription className="text-slate-500">
-//               Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa tài khoản <strong>{accountToDelete?.name}</strong>?
-//             </DialogDescription>
-//           </div>
-//           <div className="flex gap-3 mt-6">
-//             <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} className="flex-1 border-slate-200 rounded-xl h-11 font-bold">Hủy</Button>
-//             <Button onClick={confirmDelete} className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 font-bold shadow-lg shadow-red-100 dark:shadow-none">Xóa ngay</Button>
-//           </div>
-//         </DialogContent>
-//       </Dialog>
-//     </div>
-//   );
-// }
+      const rows = Array.isArray(payload?.data) ? payload.data : [];
+      const m = payload?.meta;
+      setAccounts(rows);
+      setMeta({
+        total: typeof m?.total === "number" ? m.total : rows.length,
+        currentPage: typeof m?.currentPage === "number" ? m.currentPage : page,
+        totalPages:
+          typeof m?.totalPages === "number"
+            ? m.totalPages
+            : Math.max(1, Math.ceil((m?.total ?? rows.length) / PAGE_SIZE)),
+      });
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể tải danh sách tài khoản."));
+      setAccounts([]);
+      setMeta({ total: 0, currentPage: 1, totalPages: 0 });
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debouncedSearch, roleFilter, statusFilter, isSuperAdmin, userAgencyId]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const res = await adminApi.getRoles();
+        const roleData = res.data?.data;
+        setRoles(Array.isArray(roleData) ? roleData : []);
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "Không thể tải danh sách vai trò."));
+      }
+    };
+    fetchRoles();
+  }, []);
+
+  const openCreateModal = () => {
+    setEditingAccount(null);
+    const list = rolesForForm.length ? rolesForForm : roles;
+    const defaultRole =
+      (isSuperAdmin
+        ? list.find((r) => r.name === "AGENCY_ADMIN")?.id
+        : list.find((r) => r.name === "DRIVER")?.id) ||
+      list[0]?.id ||
+      "";
+    setFormData({
+      full_name: "",
+      email: "",
+      phone: "",
+      role_id: defaultRole,
+      agency_id: userAgencyId || "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleEdit = (acc: UserItem) => {
+    setEditingAccount(acc);
+    setFormData({
+      full_name: acc.full_name || "",
+      email: acc.email || "",
+      phone: acc.phone || "",
+      role_id: acc.role?.id || "",
+      agency_id: acc.agency_id || userAgencyId || "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!formData.full_name?.trim()) {
+      toast.error("Vui lòng nhập họ tên.");
+      return;
+    }
+    if (!formData.email?.trim()) {
+      toast.error("Vui lòng nhập email.");
+      return;
+    }
+    if (!formData.phone?.trim()) {
+      toast.error("Vui lòng nhập số điện thoại.");
+      return;
+    }
+
+    if (!editingAccount) {
+      if (!formData.role_id) {
+        toast.error("Vui lòng chọn vai trò.");
+        return;
+      }
+      if (isSuperAdmin) {
+        const uuidRe =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!formData.agency_id?.trim() || !uuidRe.test(formData.agency_id.trim())) {
+          toast.error("Super Admin tạo Quản lý nhà xe: nhập Agency ID (UUID) hợp lệ.");
+          return;
+        }
+      }
+    }
+
+    setSaving(true);
+    try {
+      if (editingAccount) {
+        const updatePayload: Record<string, string> = {
+          full_name: formData.full_name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+        };
+        if (formData.role_id && editingAccount.role?.id !== formData.role_id) {
+          updatePayload.role_id = formData.role_id;
+        }
+        await adminApi.update(editingAccount.id, updatePayload);
+        toast.success("Cập nhật tài khoản thành công.");
+      } else {
+        const createPayload: Record<string, string | null> = {
+          full_name: formData.full_name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          role_id: formData.role_id,
+          agency_id: isSuperAdmin
+            ? formData.agency_id?.trim() || null
+            : userAgencyId,
+        };
+        await adminApi.create(createPayload);
+        toast.success(
+          "Tạo tài khoản thành công. Mật khẩu tạm đã được gửi qua email cho người dùng.",
+        );
+        setPage(1);
+      }
+
+      setIsDialogOpen(false);
+      await fetchAccounts();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể lưu tài khoản."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleStatus = async (acc: UserItem) => {
+    if (acc.id === userInfo.id) {
+      toast.error("Bạn không thể tự đổi trạng thái tài khoản đang đăng nhập.");
+      return;
+    }
+
+    try {
+      const nextStatus: UserStatus = acc.status === "ACTIVE" ? "BLOCKED" : "ACTIVE";
+      await adminApi.changeStatus(acc.id, nextStatus);
+      toast.success(
+        nextStatus === "BLOCKED"
+          ? "Đã khóa tài khoản. Phiên đăng nhập hiện tại (nếu có) sẽ bị hủy."
+          : "Đã mở khóa tài khoản.",
+      );
+      await fetchAccounts();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể cập nhật trạng thái."));
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!accountToDelete) return;
+
+    try {
+      await adminApi.delete(accountToDelete.id);
+      toast.success("Đã ẩn tài khoản khỏi danh sách (xóa mềm).");
+      setIsDeleteConfirmOpen(false);
+      setAccountToDelete(null);
+      if (accounts.length <= 1 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+      } else {
+        await fetchAccounts();
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Xóa thất bại."));
+    }
+  };
+
+  const from = meta.total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, meta.total);
+
+  const canManageAccounts =
+    userInfo.role === "SUPER_ADMIN" || userInfo.role === "AGENCY_ADMIN";
+
+  if (!canManageAccounts) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-8">
+        <p className="text-center text-muted-foreground">
+          Bạn không có quyền truy cập trang quản lý tài khoản.
+        </p>
+        <Button type="button" asChild className="rounded-xl font-bold">
+          <Link to="/admin/dashboard">Về Dashboard</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-4">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <h1 className="text-3xl font-black tracking-tight text-foreground">Quản lý tài khoản</h1>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+            <Icons.Search
+              className="absolute left-3 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              className="rounded-xl pl-10"
+              placeholder="Tìm theo tên hoặc email..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              aria-label="Tìm kiếm tài khoản"
+            />
+          </div>
+
+          <Select
+            value={roleFilter}
+            onValueChange={(v) => {
+              setRoleFilter(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 w-full rounded-xl border-border sm:w-[200px]">
+              <SelectValue placeholder="Vai trò" />
+            </SelectTrigger>
+            <SelectContent
+              position="popper"
+              sideOffset={4}
+              className="z-[9999] rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+            >
+              <SelectItem value={FILTER_ALL}>Tất cả vai trò</SelectItem>
+              {roles.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {roleSelectLabel(r.name)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => {
+              setStatusFilter(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 w-full rounded-xl border-border sm:w-[180px]">
+              <SelectValue placeholder="Trạng thái" />
+            </SelectTrigger>
+            <SelectContent
+              position="popper"
+              sideOffset={4}
+              className="z-[9999] rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+            >
+              <SelectItem value={FILTER_ALL}>Tất cả trạng thái</SelectItem>
+              <SelectItem value="ACTIVE">Hoạt động</SelectItem>
+              <SelectItem value="BLOCKED">Đã khóa</SelectItem>
+              <SelectItem value="INACTIVE">Không hoạt động</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-xl font-bold"
+            onClick={() => fetchAccounts()}
+            disabled={loading}
+          >
+            <Icons.RefreshCw
+              className={`mr-2 size-4 ${loading ? "animate-spin" : ""}`}
+            />
+            Làm mới
+          </Button>
+
+          <Button
+            type="button"
+            onClick={openCreateModal}
+            className="h-10 rounded-xl bg-blue-600 font-bold shadow-lg hover:bg-blue-700"
+            disabled={!roles.length && !rolesForForm.length}
+          >
+            <Icons.Plus className="mr-2 size-5" />
+            Thêm tài khoản mới
+          </Button>
+        </div>
+      </div>
+
+      <Card className="overflow-hidden rounded-3xl border border-border bg-card text-card-foreground shadow-xl">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/50 [&_tr]:border-border">
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="w-14 text-center font-bold">STT</TableHead>
+                  <TableHead className="font-bold">Họ và tên</TableHead>
+                  <TableHead className="font-bold">Email</TableHead>
+                  <TableHead className="min-w-[120px] font-bold">Số điện thoại</TableHead>
+                  <TableHead className="font-bold">Vai trò</TableHead>
+                  <TableHead className="font-bold">Trạng thái</TableHead>
+                  <TableHead className="text-center font-bold">Hành động</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-12 text-center text-muted-foreground"
+                    >
+                      Đang tải dữ liệu...
+                    </TableCell>
+                  </TableRow>
+                ) : accounts.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-12 text-center text-muted-foreground"
+                    >
+                      Không có tài khoản phù hợp bộ lọc.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  accounts.map((acc, index) => {
+                    const stt = (page - 1) * PAGE_SIZE + index + 1;
+                    const sd = statusDisplay(acc.status);
+                    return (
+                      <TableRow
+                        key={acc.id}
+                        className="border-border transition-colors hover:bg-muted/40"
+                      >
+                        <TableCell className="text-center font-medium text-muted-foreground">
+                          {stt}
+                        </TableCell>
+                        <TableCell className="font-bold text-foreground">{acc.full_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{acc.email}</TableCell>
+                        <TableCell className="text-muted-foreground">{acc.phone}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="rounded-lg font-bold">
+                            {roleBadgeLabel(acc.role?.name)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`rounded-lg font-bold ${sd.className}`}>
+                            {sd.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Chỉnh sửa"
+                              onClick={() => handleEdit(acc)}
+                            >
+                              <Icons.Pencil className="size-4 text-amber-500" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title={acc.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa"}
+                              onClick={() => toggleStatus(acc)}
+                            >
+                              {acc.status === "ACTIVE" ? (
+                                <Icons.Lock className="size-4 text-red-500" />
+                              ) : (
+                                <Icons.Unlock className="size-4 text-green-500" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Xóa mềm"
+                              onClick={() => {
+                                setAccountToDelete(acc);
+                                setIsDeleteConfirmOpen(true);
+                              }}
+                            >
+                              <Icons.Trash2 className="size-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              {meta.total > 0 ? (
+                <>
+                  Hiển thị <span className="font-bold text-foreground">{from}</span>–
+                  <span className="font-bold text-foreground">{to}</span> /{" "}
+                  <span className="font-bold text-foreground">{meta.total}</span> tài khoản
+                </>
+              ) : (
+                "Không có bản ghi"
+              )}
+            </p>
+            <div className="flex items-center justify-center gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl font-bold"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <Icons.ChevronLeft className="mr-1 size-4" />
+                Trước
+              </Button>
+              <span className="min-w-[100px] text-center font-medium">
+                Trang {meta.currentPage || page}
+                {meta.totalPages > 0 ? ` / ${meta.totalPages}` : ""}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl font-bold"
+                disabled={page >= (meta.totalPages || 1) || loading || meta.total === 0}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Sau
+                <Icons.ChevronRight className="ml-1 size-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="overflow-hidden rounded-3xl border border-border bg-card p-0 text-card-foreground shadow-2xl sm:max-w-[450px]">
+          <DialogHeader className="border-b border-border bg-muted/40 p-5 pb-4">
+            <DialogTitle className="text-xl font-black tracking-tight text-foreground">
+              {editingAccount ? "Cập nhật tài khoản" : "Thêm tài khoản mới"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 p-6 pt-4">
+            {!editingAccount && (
+              <p className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                Hệ thống tạo mật khẩu tạm và gửi qua email cho người dùng sau khi tạo tài khoản thành công.
+              </p>
+            )}
+            <div className="space-y-1">
+              <Label className="ml-1 text-sm font-bold text-foreground">
+                Họ và tên <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                className="h-11 rounded-xl border-border bg-background"
+                placeholder="Nhập họ tên đầy đủ"
+                autoComplete="name"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="ml-1 text-sm font-bold text-foreground">
+                Email <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="h-11 rounded-xl border-border bg-background"
+                placeholder="user@smartdrive.vn"
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="ml-1 text-sm font-bold text-foreground">
+                Số điện thoại <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="h-11 rounded-xl border-border bg-background"
+                placeholder="0912345678"
+                inputMode="tel"
+                autoComplete="tel"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="ml-1 text-sm font-bold text-foreground">
+                Vai trò <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.role_id}
+                onValueChange={(v) => setFormData({ ...formData, role_id: v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl border-border bg-background">
+                  <SelectValue placeholder="Chọn vai trò" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  sideOffset={4}
+                  className="z-[9999] w-[var(--radix-select-trigger-width)] rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+                >
+                  {rolesForSelect.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {roleSelectLabel(r.name)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {isSuperAdmin && (
+              <div className="space-y-1">
+                <Label className="ml-1 text-sm font-bold text-foreground">
+                  Agency ID (UUID) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={formData.agency_id}
+                  onChange={(e) => setFormData({ ...formData, agency_id: e.target.value })}
+                  className="h-11 rounded-xl border-border bg-background"
+                  placeholder="UUID nhà xe — bắt buộc khi tạo Quản lý nhà xe"
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex items-center gap-3 p-6 pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsDialogOpen(false)}
+              className="rounded-xl font-bold text-muted-foreground"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="h-11 flex-1 rounded-xl bg-blue-600 font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 dark:shadow-none"
+            >
+              {saving ? "Đang lưu..." : editingAccount ? "Lưu thay đổi" : "Tạo tài khoản"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="rounded-3xl border border-border bg-card p-8 text-card-foreground shadow-2xl sm:max-w-[400px]">
+          <div className="space-y-4 text-center">
+            <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-red-50 dark:bg-red-900/20">
+              <Icons.Trash2 className="size-8 text-red-500" />
+            </div>
+            <DialogTitle className="text-xl font-black text-foreground">
+              Xác nhận xóa tài khoản?
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Tài khoản <strong>{accountToDelete?.full_name}</strong> sẽ bị ẩn khỏi danh sách (xóa
+              mềm, dữ liệu lịch sử được giữ trên server). Bạn có chắc chắn?
+            </DialogDescription>
+          </div>
+          <div className="mt-6 flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              className="h-11 flex-1 rounded-xl border-border font-bold"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmDelete}
+              className="h-11 flex-1 rounded-xl bg-red-500 font-bold text-white shadow-lg shadow-red-100 hover:bg-red-600 dark:shadow-none"
+            >
+              Xóa
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

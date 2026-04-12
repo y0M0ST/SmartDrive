@@ -94,23 +94,23 @@ export default function ForgotPasswordPage() {
       'Set a password'
     }>
       
-      <Link to="/login" className="mb-6 inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
+      <Link to="/login" className="mb-6 inline-flex items-center text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
         <ArrowLeft size={16} className="mr-2" /> Back to sign in
       </Link>
 
       {/* --- FORM BƯỚC A: EMAIL --- */}
       {step === 'email' && (
         <form onSubmit={handleEmailSubmit(onEmailSubmit)} className="space-y-6">
-          <p className="text-sm text-gray-600">Nhập email của bạn để nhận mã xác nhận.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Nhập email của bạn để nhận mã xác nhận.</p>
           <div className="space-y-2 relative">
             <Label htmlFor="email">E-mail</Label>
             <div className="relative">
               <Input id="email" {...regEmail("email")} className={emailErr.email ? "border-red-500 pl-10" : "pl-10"} />
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={20} />
             </div>
             {emailErr.email && <p className="text-sm text-red-500">{emailErr.email.message}</p>}
           </div>
-          <Button type="submit" className="w-full bg-gray-900 text-white" disabled={loading}>
+          <Button type="submit" className="w-full bg-slate-900 hover:bg-black dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white text-white" disabled={loading}>
             {loading ? <Loader2 className="animate-spin" /> : "Submit"}
           </Button>
         </form>
@@ -119,20 +119,20 @@ export default function ForgotPasswordPage() {
       {/* --- FORM BƯỚC B: OTP --- */}
       {step === 'otp' && (
         <form onSubmit={handleOtpSubmit(onOtpSubmit)} className="space-y-6">
-          <p className="text-sm text-gray-600">Mã đã được gửi đến {email}.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Mã đã được gửi đến {email}.</p>
           <div className="space-y-2">
             <Label htmlFor="otp">Verify code (OTP)</Label>
             <Input id="otp" {...regOtp("otp")} maxLength={6} className="text-center text-2xl font-bold tracking-widest" />
             {otpErr.otp && <p className="text-sm text-red-500">{otpErr.otp.message}</p>}
           </div>
-          <Button type="submit" className="w-full bg-gray-900 text-white">Verify</Button>
+          <Button type="submit" className="w-full bg-slate-900 hover:bg-black dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white text-white">Verify</Button>
         </form>
       )}
 
       {/* --- FORM BƯỚC C: RESET PASSWORD --- */}
       {step === 'reset' && (
         <form onSubmit={handleResetSubmit(onResetSubmit)} className="space-y-6">
-          <p className="text-sm text-gray-600">Vui lòng nhập mật khẩu mới.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Vui lòng nhập mật khẩu mới.</p>
           
           <div className="space-y-2">
             <Label>Mật khẩu mới</Label>
@@ -142,7 +142,7 @@ export default function ForgotPasswordPage() {
                 {...regReset("password")} 
                 className="pr-10" 
               />
-              <button type="button" onClick={() => setShowPass(p => ({...p, new: !p.new}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <button type="button" onClick={() => setShowPass(p => ({...p, new: !p.new}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                 {showPass.new ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
@@ -157,14 +157,14 @@ export default function ForgotPasswordPage() {
                 {...regReset("confirmPassword")} 
                 className="pr-10" 
               />
-              <button type="button" onClick={() => setShowPass(p => ({...p, confirm: !p.confirm}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <button type="button" onClick={() => setShowPass(p => ({...p, confirm: !p.confirm}))} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                 {showPass.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
             {resetErr.confirmPassword && <p className="text-sm text-red-500">{resetErr.confirmPassword.message}</p>}
           </div>
 
-          <Button type="submit" className="w-full bg-gray-900 text-white" disabled={loading}>
+          <Button type="submit" className="w-full bg-slate-900 hover:bg-black dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white text-white" disabled={loading}>
             {loading ? <Loader2 className="animate-spin" /> : "Set password"}
           </Button>
         </form>

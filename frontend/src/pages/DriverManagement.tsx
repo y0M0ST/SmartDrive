@@ -1,299 +1,433 @@
-import { useState, useEffect } from 'react'; // Thêm useEffect ở đây
-import axios from 'axios'; // Thêm dòng này
-import DriverModal from '../components/DriverModal';
-import ConfirmModal from '../components/ConfirmModal';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { adminApi } from "@/services/adminApi";
+import { toast } from "sonner";
+import { AxiosError } from "axios";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import * as Icons from "lucide-react";
+import DriverModal from "@/components/DriverModal";
+import ConfirmModal from "@/components/ConfirmModal";
 
+const PAGE_SIZE = 10;
 
-interface Driver {
-  id: string;
-  full_name: string;      // Trong DB là full_name, không phải fullName
-  phone: string;
-  license_number: string; // Trong DB là license_number
-  license_type: string;   // Trong DB là license_type (thay cho licenseClass)
-  license_expiry_date: string; // Trong DB là license_expiry_date
-  face_image_url: string; // Trong DB là face_image_url (thay cho avatar)
-  status: string;
-  safety_score: number;   // Có thêm cột này trong DB nè Rin
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof AxiosError) {
+    const msg = error.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+  }
+  return fallback;
 }
 
-const DriverManagement = () => {
-  // --- THAY ĐỔI TẠI ĐÂY ---
-  const [drivers, setDrivers] = useState<Driver[]>([]); // Khởi tạo mảng rỗng
-  const [loading, setLoading] = useState(true); // Trạng thái đợi lấy dữ liệu
+type UserStatus = "ACTIVE" | "INACTIVE" | "BLOCKED";
 
-  // Hàm này để gọi API lấy danh sách từ Backend
-const fetchDrivers = async () => {
-  try {
-    // 1. Lấy token từ localStorage (đã lưu khi login thành công)
-    const token = localStorage.getItem("access_token");
+interface DriverAccountRow {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  status: UserStatus;
+  driver_code?: string | null;
+  has_driver_profile?: boolean;
+}
 
-    const response = await axios.get('http://localhost:5000/api/drivers', {
-      // 2. Gửi token kèm theo header "Authorization"
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    
-    // 3. Lấy dữ liệu (nhớ check cấu trúc response.data của bạn)
-    const dataFromBE = response.data.data || response.data;
-    
-    setDrivers(Array.isArray(dataFromBE) ? dataFromBE : []);
-  } catch (error) {
-    console.error("Lỗi 401 rồi, Token có vấn đề hoặc hết hạn!", error);
-  } finally {
-    setLoading(false);
+function statusBadge(status: UserStatus) {
+  switch (status) {
+    case "ACTIVE":
+      return {
+        label: "Hoạt động",
+        className:
+          "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/35 dark:text-emerald-200",
+      };
+    case "BLOCKED":
+      return {
+        label: "Đã khóa",
+        className: "bg-red-100 text-red-800 dark:bg-red-900/35 dark:text-red-200",
+      };
+    default:
+      return {
+        label: "Không hoạt động",
+        className: "bg-muted text-muted-foreground",
+      };
   }
-};
-useEffect(() => {
-  fetchDrivers();
-}, []);
-  // --- HẾT PHẦN THAY ĐỔI ---
+}
 
-  // ... (Các State tìm kiếm, Modal bên dưới giữ nguyên)
+export default function DriverManagement() {
+  const [rows, setRows] = useState<DriverAccountRow[]>([]);
+  const [meta, setMeta] = useState({ total: 0, currentPage: 1, totalPages: 0 });
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [driverRoleId, setDriverRoleId] = useState("");
 
-  // --- STATE TÌM KIẾM ---
-  const [searchInput, setSearchInput] = useState('');
-  const [appliedQuery, setAppliedQuery] = useState('');
-
-  // --- STATE MODAL ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [modalMode, setModalMode] = useState<"add" | "edit">("add");
+  const [selectedDriver, setSelectedDriver] = useState<DriverAccountRow | null>(null);
 
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<DriverAccountRow | null>(null);
 
-  // --- HÀM XỬ LÝ TÌM KIẾM ---
-  const filteredDrivers = drivers.filter((driver) => {
-    const keyword = appliedQuery.toLowerCase();
-    if (!keyword) return true;
-    
-    // Thêm dấu ?. để nếu full_name bị null thì app không bị trắng trang
-    const name = driver.full_name?.toLowerCase() || '';
-    const phone = driver.phone || '';
-    
-    return name.includes(keyword) || phone.includes(keyword);
-  });
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
 
-  const handleSearch = () => {
-    setAppliedQuery(searchInput);
-  };
+  const prevDebounced = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevDebounced.current === null) {
+      prevDebounced.current = debouncedSearch;
+      return;
+    }
+    if (prevDebounced.current === debouncedSearch) return;
+    prevDebounced.current = debouncedSearch;
+    setPage(1);
+  }, [debouncedSearch]);
 
-  
-  // --- HÀM XỬ LÝ MODAL ---
-  const handleOpenAdd = () => {
-    setModalMode('add');
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await adminApi.getRoles();
+        const list = res.data?.data as { id: string; name: string }[] | undefined;
+        const d = Array.isArray(list) ? list.find((r) => r.name === "DRIVER") : undefined;
+        if (d) setDriverRoleId(d.id);
+        else toast.error("Không tìm thấy vai trò tài xế trong hệ thống.");
+      } catch {
+        toast.error("Không tải được danh sách vai trò.");
+      }
+    })();
+  }, []);
+
+  const fetchList = useCallback(async () => {
+    if (!driverRoleId) return;
+    setLoading(true);
+    try {
+      const params: Record<string, string | number> = {
+        page,
+        limit: PAGE_SIZE,
+        role_id: driverRoleId,
+      };
+      if (debouncedSearch) params.search = debouncedSearch;
+
+      const res = await adminApi.getList(params);
+      const payload = res.data?.data as
+        | {
+            data?: DriverAccountRow[];
+            meta?: { total?: number; currentPage?: number; totalPages?: number };
+          }
+        | undefined;
+      const data = Array.isArray(payload?.data) ? payload.data : [];
+      const m = payload?.meta;
+      setRows(
+        data.map((u) => ({
+          id: u.id,
+          full_name: u.full_name,
+          email: u.email,
+          phone: u.phone,
+          status: (u.status as UserStatus) || "ACTIVE",
+          driver_code: u.driver_code ?? null,
+          has_driver_profile: Boolean(u.has_driver_profile),
+        })),
+      );
+      setMeta({
+        total: typeof m?.total === "number" ? m.total : data.length,
+        currentPage: typeof m?.currentPage === "number" ? m.currentPage : page,
+        totalPages:
+          typeof m?.totalPages === "number"
+            ? m.totalPages
+            : Math.max(1, Math.ceil((m?.total ?? data.length) / PAGE_SIZE)),
+      });
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Không tải được danh sách tài xế."));
+      setRows([]);
+      setMeta({ total: 0, currentPage: 1, totalPages: 0 });
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debouncedSearch, driverRoleId]);
+
+  useEffect(() => {
+    fetchList();
+  }, [fetchList]);
+
+  const me = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user_info") || "{}") as { id?: string };
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const openAdd = () => {
+    setModalMode("add");
     setSelectedDriver(null);
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (driver: Driver) => {
-    setModalMode('edit');
-    setSelectedDriver(driver);
+  const openEdit = (d: DriverAccountRow) => {
+    setModalMode("edit");
+    setSelectedDriver(d);
     setIsModalOpen(true);
   };
 
-  // --- THÊM ĐOẠN NÀY ---
-  // --- SỬA LẠI ĐOẠN NÀY ---
-  const handleDeleteClick = (driver: Driver) => {
-    // US_05: Check nếu tài xế đang chạy thì báo lỗi luôn, không cho mở Modal xóa
-    if (driver.status === 'on_trip' || driver.status === 'Đang chạy') {
-      alert("⚠️ Thất bại: Tài xế đang thực hiện chuyến đi, không thể xóa hồ sơ!");
+  const toggleStatus = async (d: DriverAccountRow) => {
+    if (d.id === me.id) {
+      toast.error("Bạn không thể đổi trạng thái tài khoản đang đăng nhập.");
       return;
     }
-    
-    setDriverToDelete(driver);
-    setIsDeleteModalOpen(true);
+    try {
+      const next: UserStatus = d.status === "ACTIVE" ? "BLOCKED" : "ACTIVE";
+      await adminApi.changeStatus(d.id, next);
+      toast.success(next === "BLOCKED" ? "Đã khóa tài khoản tài xế." : "Đã mở khóa tài khoản tài xế.");
+      await fetchList();
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Không cập nhật được trạng thái."));
+    }
   };
 
-  // Tìm hàm handleConfirmDelete và sửa lại như sau:
-const handleConfirmDelete = async () => {
-  if (driverToDelete) {
+  const confirmDelete = async () => {
+    if (!toDelete) return;
     try {
-      const token = localStorage.getItem("access_token");
-      await axios.delete(`http://localhost:5000/api/drivers/${driverToDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      alert("Xóa thành công!");
-      fetchDrivers(); // Cập nhật lại UI
-      setIsDeleteModalOpen(false);
-    } catch (error: any) {
-      // US_05: Thông báo lỗi nếu tài xế đang thực hiện chuyến đi
-      const msg = error.response?.data?.message || "Lỗi xóa tài xế";
-      alert("⚠️ " + msg);
+      await adminApi.delete(toDelete.id);
+      toast.success("Đã xóa tài khoản khỏi danh sách.");
+      setDeleteOpen(false);
+      setToDelete(null);
+      if (rows.length <= 1 && page > 1) setPage((p) => Math.max(1, p - 1));
+      else await fetchList();
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Xóa không thành công."));
     }
-  }
-};
-if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-white text-blue-600 font-bold">
-        Đang tải dữ liệu ...
-      </div>
-    );
-  }
+  };
 
-const handleSuccess = () => {
-  // 1. Tuyệt đối KHÔNG dùng window.location.reload()
-  // 2. Chỉ gọi hàm fetchDrivers để cập nhật State drivers
-  fetchDrivers();   
-  
-  // 3. Đóng modal (nếu DriverModal chưa tự đóng)
-  setIsModalOpen(false);
-};
+  const from = meta.total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, meta.total);
 
-  const isExpired = (expiryDate: string) => {
-  if (!expiryDate) return false;
-  const today = new Date();
-  const expire = new Date(expiryDate);
-  // Nếu ngày hết hạn nhỏ hơn hoặc bằng ngày hôm nay => Hết hạn
-  return expire <= today; 
-};
+  const editInitial =
+    modalMode === "edit" && selectedDriver
+      ? {
+          id: selectedDriver.id,
+          full_name: selectedDriver.full_name,
+          email: selectedDriver.email,
+          phone: selectedDriver.phone,
+          status: selectedDriver.status,
+          driver_code: selectedDriver.driver_code ?? null,
+          has_driver_profile: selectedDriver.has_driver_profile,
+        }
+      : undefined;
 
   return (
-    <div className="w-full">
-   
-
-        <div className="flex-1 p-10 overflow-y-auto">
-          <div className="max-w-7xl mx-auto bg-white min-h-[600px] flex flex-col justify-between rounded-2xl shadow-sm border-[1.5px] border-slate-800 overflow-hidden">
-            <div>
-              <div className="p-8 pb-6 flex justify-between items-center border-b border-slate-100">
-                <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Thông tin tài xế</h1>
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    </div>
-                    <input 
-                      type="text" 
-                      placeholder="Nhập tên hoặc SĐT..." 
-                      className="pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 w-72 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
-                      value={searchInput}
-                      onChange={(e) => setSearchInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()} 
-                    />
-                  </div>
-                  <button 
-                    onClick={handleSearch}
-                    className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-all shadow-sm active:scale-95"
-                  >
-                    Tìm kiếm
-                  </button>
-                </div>
-              </div>
-
-              <div className="w-full overflow-hidden">
-                <table className="w-full text-left text-[14px] text-slate-600">
-                  <thead className="bg-[#fdfdfd] border-b border-slate-100">
-                    <tr className="text-slate-800 font-bold">
-                      <th className="py-4 px-6">Mã tài xế</th>
-                      <th className="py-4 px-6">Họ và tên</th>
-                      <th className="py-4 px-6">Email</th>
-                      <th className="py-4 px-6">Số điện thoại</th>
-                      <th className="py-4 px-6 text-center">Số hạng bằng lái</th>
-                      <th className="py-4 px-6 text-center">Hạng bằng lái</th>
-                      <th className="py-4 px-6 text-center">Ngày hết hạn</th>
-                      <th className="py-4 px-6 text-center">Chân dung</th>
-                      <th className="py-4 px-6 text-center">Trạng thái</th>
-                      <th className="py-4 px-6 text-center">Hành động</th> {/* Thêm cột Hành động */}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredDrivers.length > 0 ? (
-                      filteredDrivers.map((d) => {
-                        // --- LOGIC KIỂM TRA HẾT HẠN ---
-                        const today = new Date();
-                        const expiryDate = d.license_expiry_date ? new Date(d.license_expiry_date) : null;
-                        const isExpired = expiryDate ? expiryDate <= today : false;
-
-                        return (
-                          <tr 
-                            key={d.id} 
-                            // Nếu hết hạn thì dòng hơi ửng đỏ nhẹ (bg-red-50/30)
-                            className={`hover:bg-slate-50 transition-colors group ${isExpired ? 'bg-red-50/50' : ''}`}
-                          >
-                            <td className="py-4 px-6 font-medium text-slate-800 uppercase">{d.id?.substring(0, 5)}</td>
-                            <td className="py-4 px-6 font-bold text-slate-800">{d.full_name || 'Chưa rõ tên'}</td>
-                            <td className="py-4 px-6 font-medium text-slate-500">N/A</td>
-                            <td className="py-4 px-6 font-medium">{d.phone || 'N/A'}</td>
-                            <td className="py-4 px-6 text-center font-medium">{d.license_number}</td>
-                            <td className="py-4 px-6 text-center font-medium">{d.license_type}</td>
-                            
-                            {/* --- CỘT NGÀY HẾT HẠN (SỬA Ở ĐÂY) --- */}
-                            <td className={`py-4 px-6 text-center font-bold ${isExpired ? 'text-red-600 animate-pulse' : 'text-slate-600'}`}>
-                              <div className="flex items-center justify-center gap-1">
-                                {isExpired && (
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                                {d.license_expiry_date ? new Date(d.license_expiry_date).toLocaleDateString('vi-VN') : 'N/A'}
-                              </div>
-                            </td>
-
-                            <td className="py-4 px-6 text-center">
-                              {d.face_image_url ? "Có ảnh" : "N/A"}
-                            </td>
-                            <td className="py-4 px-6 text-center">
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-bold bg-[#e6f7ee] text-[#00a65a]">
-                                {d.status}
-                              </span>
-                            </td>
-                            <td className="py-4 px-6 flex justify-center gap-3">
-                              <button onClick={() => handleOpenEdit(d)} className="text-amber-500 hover:text-amber-600 transition-colors" title="Sửa">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                              </button>
-                              <button onClick={() => handleDeleteClick(d)} className="text-slate-400 hover:text-red-500 transition-colors" title="Xóa">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={9} className="py-16 text-center">
-                           <p className="text-slate-500 font-medium">Không tìm thấy tài xế nào khớp với "{appliedQuery}"</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* ACTION BUTTONS */}
-            <div className="p-8 bg-white border-t border-slate-100 flex justify-center gap-6">
-              
-              {/* Nút Thêm Tài Xế Mở Modal */}
-              <button onClick={handleOpenAdd} className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-blue-600 bg-white border-[1.5px] border-blue-600 rounded-full hover:bg-blue-50 transition-all shadow-sm active:scale-95">
-                <span className="text-lg leading-none font-medium">+</span> Thêm tài xế
-              </button>
-              
-              
-            </div>
-            
-          </div>
+    <div className="space-y-6 text-foreground">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight">Tài xế &amp; tài khoản</h1>
+          <p className="mt-1 max-w-2xl text-muted-foreground">
+            Quản lý tài khoản tài xế: tìm kiếm, khóa hoặc xóa. Thêm mới chỉ tạo tài khoản (mật khẩu tạm gửi qua email —
+            không ai xem được mật khẩu). Hồ sơ CMND, GPLX và ảnh chân dung bổ sung sau khi bấm Sửa.
+          </p>
         </div>
+        <Button
+          type="button"
+          onClick={openAdd}
+          disabled={!driverRoleId}
+          className="h-11 shrink-0 rounded-xl bg-blue-600 font-bold shadow-lg hover:bg-blue-700"
+        >
+          <Icons.UserPlus className="mr-2 size-5" />
+          Thêm tài xế
+        </Button>
+      </div>
 
-        {/* GỌI MODAL RA Ở ĐÂY, TRUYỀN DỮ LIỆU */}
-      <DriverModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        mode={modalMode} 
-        initialData={selectedDriver} 
-        onSuccess={handleSuccess} 
+      <Card className="rounded-3xl border border-border bg-card text-card-foreground shadow-sm">
+        <CardHeader className="flex flex-col gap-4 border-b border-border sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardTitle className="text-lg font-black">Danh sách tài xế</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Chỉ hiển thị tài khoản có vai trò tài xế trong phạm vi nhà xe của bạn.
+            </CardDescription>
+          </div>
+          <div className="relative w-full sm:max-w-xs">
+            <Icons.Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="rounded-xl border-border bg-muted pl-9"
+              placeholder="Tìm theo tên hoặc email..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto border-t border-border">
+            <Table>
+              <TableHeader className="bg-muted/50 [&_tr]:border-border">
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="w-14 text-center font-bold">STT</TableHead>
+                  <TableHead className="font-bold">Họ và tên</TableHead>
+                  <TableHead className="font-bold">Email</TableHead>
+                  <TableHead className="font-bold">Điện thoại</TableHead>
+                  <TableHead className="font-bold">Hồ sơ TX</TableHead>
+                  <TableHead className="font-bold">Trạng thái</TableHead>
+                  <TableHead className="text-right font-bold">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {!driverRoleId ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      Đang tải cấu hình…
+                    </TableCell>
+                  </TableRow>
+                ) : loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      Đang tải…
+                    </TableCell>
+                  </TableRow>
+                ) : rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      Chưa có tài xế. Bấm &quot;Thêm tài xế&quot; để tạo tài khoản và hồ sơ.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((d, i) => {
+                    const sb = statusBadge(d.status);
+                    const stt = (page - 1) * PAGE_SIZE + i + 1;
+                    return (
+                      <TableRow key={d.id} className="border-border hover:bg-muted/40">
+                        <TableCell className="text-center text-muted-foreground">{stt}</TableCell>
+                        <TableCell className="font-bold text-foreground">{d.full_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{d.email}</TableCell>
+                        <TableCell className="text-muted-foreground">{d.phone}</TableCell>
+                        <TableCell>
+                          {d.has_driver_profile && d.driver_code ? (
+                            <span className="font-mono text-xs font-bold text-foreground">{d.driver_code}</span>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="rounded-lg border-amber-300 bg-amber-50 font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                            >
+                              Chưa có hồ sơ
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`rounded-lg font-bold ${sb.className}`}>{sb.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="rounded-lg border-border"
+                              onClick={() => openEdit(d)}
+                            >
+                              Sửa
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="rounded-lg border-border"
+                              onClick={() => toggleStatus(d)}
+                            >
+                              {d.status === "ACTIVE" ? "Khóa" : "Mở khóa"}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="rounded-lg border-destructive/50 text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                setToDelete(d);
+                                setDeleteOpen(true);
+                              }}
+                            >
+                              Xóa
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex flex-col gap-2 border-t border-border px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {meta.total > 0 ? (
+                <>
+                  {from}–{to} / {meta.total} tài xế
+                </>
+              ) : (
+                "—"
+              )}
+            </span>
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || loading || !driverRoleId}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Trước
+              </Button>
+              <span className="text-foreground">
+                Trang {page}/{meta.totalPages || 1}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page >= (meta.totalPages || 1) || loading || meta.total === 0}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Sau
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <DriverModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        mode={modalMode}
+        initialData={editInitial}
+        onSuccess={() => {
+          setIsModalOpen(false);
+          void fetchList();
+          if (modalMode === "add") setPage(1);
+        }}
       />
-      
-      <ConfirmModal 
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Xóa tài xế"
-        message="Bạn có chắc chắn muốn xóa tài xế"
-        itemName={driverToDelete?.full_name || ""}
+
+      <ConfirmModal
+        isOpen={deleteOpen}
+        onClose={() => {
+          setDeleteOpen(false);
+          setToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Xóa tài khoản tài xế"
+        message="Bạn có chắc muốn xóa (ẩn) tài khoản"
+        itemName={toDelete?.full_name || ""}
       />
-    </div> // Đây là thẻ đóng duy nhất của div ngoài cùng ở dòng 127
+    </div>
   );
-};
-
-export default DriverManagement;
+}
