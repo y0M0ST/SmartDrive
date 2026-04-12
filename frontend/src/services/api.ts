@@ -1,7 +1,7 @@
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api", // Đã có /api ở đây
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
   headers: { "Content-Type": "application/json" }
 });
 
@@ -9,7 +9,17 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("access_token");
-    
+
+    /** FormData cần boundary tự sinh — không gửi application/json mặc định của instance */
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      const h = config.headers;
+      if (h instanceof AxiosHeaders) {
+        h.delete("Content-Type");
+      } else {
+        delete (h as Record<string, unknown>)["Content-Type"];
+      }
+    }
+
     if (token) {
       // Giữ nguyên chuẩn Bearer vì Swagger của bạn yêu cầu SecurityScheme là bearerAuth
       config.headers.Authorization = `Bearer ${token}`;
