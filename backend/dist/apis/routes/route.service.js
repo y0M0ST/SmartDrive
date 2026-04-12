@@ -7,19 +7,19 @@ const route_entity_1 = require("../../entities/route.entity");
 const trip_entity_1 = require("../../entities/trip.entity");
 const enums_1 = require("../../common/constants/enums");
 const app_error_1 = require("../../common/errors/app-error");
+const province_constant_1 = require("../provinces/province.constant");
 const normalizeText = (value) => value.trim();
-const normalizeForCompare = (value) => normalizeText(value).toLocaleLowerCase();
 const generateRouteCode = () => `RT-${Math.floor(10000 + Math.random() * 90000)}`;
 /**
- * Trùng nghiệp vụ: cùng agency, cùng tên + điểm đi + điểm đến (không phân biệt hoa thường, trim khoảng trắng).
+ * Trùng nghiệp vụ: cùng agency, cùng tên + mã điểm đi + mã điểm đến (`start_point` / `end_point` là mã VIETNAM_PROVINCES).
  */
 const findConflictingRoute = async (routeRepo, agencyId, name, startPoint, endPoint, excludeRouteId) => {
     const qb = routeRepo
         .createQueryBuilder('r')
         .where('r.agency_id = :agencyId', { agencyId })
         .andWhere('LOWER(TRIM(r.name)) = LOWER(TRIM(:name))', { name })
-        .andWhere('LOWER(TRIM(r.start_point)) = LOWER(TRIM(:sp))', { sp: startPoint })
-        .andWhere('LOWER(TRIM(r.end_point)) = LOWER(TRIM(:ep))', { ep: endPoint });
+        .andWhere('r.start_point = :sp', { sp: startPoint })
+        .andWhere('r.end_point = :ep', { ep: endPoint });
     if (excludeRouteId) {
         qb.andWhere('r.id != :excludeId', { excludeId: excludeRouteId });
     }
@@ -66,10 +66,10 @@ exports.getRoutes = getRoutes;
 // ==========================================
 const createRoute = async (agencyId, input) => {
     const routeRepo = data_source_1.AppDataSource.getRepository(route_entity_1.Route);
-    const normalizedStart = normalizeText(input.start_point);
-    const normalizedEnd = normalizeText(input.end_point);
+    const normalizedStart = (0, province_constant_1.normalizeVietnamProvinceCode)(input.start_point);
+    const normalizedEnd = (0, province_constant_1.normalizeVietnamProvinceCode)(input.end_point);
     const normalizedName = normalizeText(input.name);
-    if (normalizeForCompare(normalizedStart) === normalizeForCompare(normalizedEnd)) {
+    if (normalizedStart === normalizedEnd) {
         throw new app_error_1.AppError('Điểm xuất phát và Điểm đến không được trùng nhau!', 400);
     }
     const duplicate = await findConflictingRoute(routeRepo, agencyId, normalizedName, normalizedStart, normalizedEnd);
@@ -98,9 +98,11 @@ const updateRoute = async (agencyId, routeId, input) => {
     const route = await routeRepo.findOneBy({ id: routeId, agency_id: agencyId });
     if (!route)
         throw new app_error_1.AppError('Không tìm thấy tuyến đường', 404);
-    const nextStart = input.start_point !== undefined ? normalizeText(input.start_point) : route.start_point;
-    const nextEnd = input.end_point !== undefined ? normalizeText(input.end_point) : route.end_point;
-    if (normalizeForCompare(nextStart) === normalizeForCompare(nextEnd)) {
+    const nextStart = input.start_point !== undefined
+        ? (0, province_constant_1.normalizeVietnamProvinceCode)(input.start_point)
+        : route.start_point;
+    const nextEnd = input.end_point !== undefined ? (0, province_constant_1.normalizeVietnamProvinceCode)(input.end_point) : route.end_point;
+    if (nextStart === nextEnd) {
         throw new app_error_1.AppError('Điểm xuất phát và Điểm đến không được trùng nhau!', 400);
     }
     const nextName = input.name !== undefined ? normalizeText(input.name) : route.name;

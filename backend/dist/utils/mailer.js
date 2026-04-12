@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendNewAccountCredentialsEmail = exports.sendResetPasswordEmail = void 0;
+exports.sendProfileContactChangeOtpEmail = exports.sendNewAccountCredentialsEmail = exports.sendResetPasswordEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const createMailerTransport = () => nodemailer_1.default.createTransport({
     host: process.env.MAIL_HOST || 'smtp.gmail.com',
@@ -60,4 +60,28 @@ const sendNewAccountCredentialsEmail = async (toEmail, fullName, temporaryPasswo
     await transporter.sendMail(mailOptions);
 };
 exports.sendNewAccountCredentialsEmail = sendNewAccountCredentialsEmail;
+/** OTP đổi email / SĐT (Profile) — gửi tới hộp thư người nhận `toEmail`. */
+const sendProfileContactChangeOtpEmail = async (toEmail, fullName, code, kind, newValueLabel) => {
+    const transporter = createMailerTransport();
+    const purpose = kind === 'email'
+        ? 'xác nhận địa chỉ email mới cho tài khoản SmartDrive của bạn'
+        : 'xác nhận thay đổi số điện thoại cho tài khoản SmartDrive của bạn';
+    const mailOptions = {
+        from: process.env.MAIL_FROM,
+        to: toEmail,
+        subject: kind === 'email'
+            ? '[SmartDrive] Mã xác nhận đổi email'
+            : '[SmartDrive] Mã xác nhận đổi số điện thoại',
+        html: `
+      <h3>Xin chào ${fullName},</h3>
+      <p>Bạn đã yêu cầu ${purpose}.</p>
+      <p><strong>Giá trị mới:</strong> ${newValueLabel}</p>
+      <p>Mã xác nhận gồm 6 chữ số (hiệu lực 15 phút):</p>
+      <p style="font-size: 28px; letter-spacing: 6px; font-weight: bold;">${code}</p>
+      <p>Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email và đổi mật khẩu nếu nghi ngờ tài khoản bị lộ.</p>
+    `,
+    };
+    await transporter.sendMail(mailOptions);
+};
+exports.sendProfileContactChangeOtpEmail = sendProfileContactChangeOtpEmail;
 //# sourceMappingURL=mailer.js.map

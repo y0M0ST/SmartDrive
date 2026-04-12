@@ -63,7 +63,7 @@ exports.updateProfile = (0, catchAsync_1.catchAsync)(async (req, res) => {
 exports.getProfile = (0, catchAsync_1.catchAsync)(async (req, res) => {
     const result = await profileService.getProfileInfo(req.params.userId, getActor(req));
     if (!result)
-        throw new Error('Tài xế này chưa có hồ sơ');
+        throw new app_error_1.AppError('Tai xe nay chua co ho so.', 404);
     res.status(200).json(serviceResponse_1.ServiceResponse.success('Lấy hồ sơ thành công', result));
 });
 //# sourceMappingURL=driver-profile.controller.js.map

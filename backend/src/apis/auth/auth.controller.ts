@@ -3,6 +3,8 @@ import { catchAsync } from '../../utils/catchAsync';
 import { ServiceResponse } from '../../models/serviceResponse';
 import * as authService from './auth.service';
 
+const userIdFromReq = (req: Request) => (req as unknown as { user: { id: string } }).user.id;
+
 export const loginController = catchAsync(async (req: Request, res: Response) => {
     // Bắt IP và User-Agent để lưu log bảo mật
     const ipAddress = req.ip || req.socket.remoteAddress;
@@ -33,11 +35,31 @@ export const logoutController = catchAsync(async (req: Request, res: Response) =
 
 export const changePasswordController = catchAsync(async (req: Request, res: Response) => {
     // GIẢ ĐỊNH: Bồ đã có authMiddleware gắn thông tin giải mã JWT vào req.user
-    const userId = (req as any).user.id;
+    const userId = userIdFromReq(req);
 
     await authService.changePassword(userId, req.body);
 
     res.status(200).json(ServiceResponse.success('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'));
+});
+
+export const getMeController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.getMe(userIdFromReq(req));
+    res.status(200).json(ServiceResponse.success('OK', data));
+});
+
+export const patchMeProfileController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.updateMyProfile(userIdFromReq(req), req.body);
+    res.status(200).json(ServiceResponse.success('Cập nhật họ tên thành công.', data));
+});
+
+export const requestContactChangeController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.requestProfileContactChange(userIdFromReq(req), req.body);
+    res.status(200).json(ServiceResponse.success(data.message, data));
+});
+
+export const verifyContactChangeController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.verifyProfileContactChange(userIdFromReq(req), req.body);
+    res.status(200).json(ServiceResponse.success('Cập nhật email / số điện thoại thành công.', data));
 });
 
 export const forgotPasswordController = catchAsync(async (req: Request, res: Response) => {

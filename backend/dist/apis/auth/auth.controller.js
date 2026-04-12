@@ -33,10 +33,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPasswordController = exports.forgotPasswordController = exports.changePasswordController = exports.logoutController = exports.loginController = void 0;
+exports.resetPasswordController = exports.forgotPasswordController = exports.verifyContactChangeController = exports.requestContactChangeController = exports.patchMeProfileController = exports.getMeController = exports.changePasswordController = exports.logoutController = exports.loginController = void 0;
 const catchAsync_1 = require("../../utils/catchAsync");
 const serviceResponse_1 = require("../../models/serviceResponse");
 const authService = __importStar(require("./auth.service"));
+const userIdFromReq = (req) => req.user.id;
 exports.loginController = (0, catchAsync_1.catchAsync)(async (req, res) => {
     // Bắt IP và User-Agent để lưu log bảo mật
     const ipAddress = req.ip || req.socket.remoteAddress;
@@ -56,9 +57,25 @@ exports.logoutController = (0, catchAsync_1.catchAsync)(async (req, res) => {
 });
 exports.changePasswordController = (0, catchAsync_1.catchAsync)(async (req, res) => {
     // GIẢ ĐỊNH: Bồ đã có authMiddleware gắn thông tin giải mã JWT vào req.user
-    const userId = req.user.id;
+    const userId = userIdFromReq(req);
     await authService.changePassword(userId, req.body);
     res.status(200).json(serviceResponse_1.ServiceResponse.success('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'));
+});
+exports.getMeController = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const data = await authService.getMe(userIdFromReq(req));
+    res.status(200).json(serviceResponse_1.ServiceResponse.success('OK', data));
+});
+exports.patchMeProfileController = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const data = await authService.updateMyProfile(userIdFromReq(req), req.body);
+    res.status(200).json(serviceResponse_1.ServiceResponse.success('Cập nhật họ tên thành công.', data));
+});
+exports.requestContactChangeController = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const data = await authService.requestProfileContactChange(userIdFromReq(req), req.body);
+    res.status(200).json(serviceResponse_1.ServiceResponse.success(data.message, data));
+});
+exports.verifyContactChangeController = (0, catchAsync_1.catchAsync)(async (req, res) => {
+    const data = await authService.verifyProfileContactChange(userIdFromReq(req), req.body);
+    res.status(200).json(serviceResponse_1.ServiceResponse.success('Cập nhật email / số điện thoại thành công.', data));
 });
 exports.forgotPasswordController = (0, catchAsync_1.catchAsync)(async (req, res) => {
     // Dù email sai hay đúng, mình vẫn trả về 1 câu chung chung để chống Hacker dò email hệ thống

@@ -110,10 +110,12 @@ router.use(auth_middleware_1.authMiddleware, (0, auth_middleware_1.requireRole)(
  *                 example: Da Nang - Hue
  *               start_point:
  *                 type: string
- *                 example: Da Nang
+ *                 description: Ma tinh thanh (GET /api/provinces)
+ *                 example: DA_NANG
  *               end_point:
  *                 type: string
- *                 example: Hue
+ *                 description: Ma tinh thanh (GET /api/provinces)
+ *                 example: THUA_THIEN_HUE
  *               distance_km:
  *                 type: number
  *                 example: 102.5
@@ -160,10 +162,10 @@ router.post('/', (0, validate_middleware_1.validate)(route_dto_1.createRouteSche
  *                 example: Da Nang - Hue (cao toc)
  *               start_point:
  *                 type: string
- *                 example: Da Nang
+ *                 example: DA_NANG
  *               end_point:
  *                 type: string
- *                 example: Hue
+ *                 example: THUA_THIEN_HUE
  *               distance_km:
  *                 type: number
  *                 example: 98.2

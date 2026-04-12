@@ -4,7 +4,11 @@ import {
     logoutController,
     changePasswordController,
     forgotPasswordController,
-    resetPasswordController
+    resetPasswordController,
+    getMeController,
+    patchMeProfileController,
+    requestContactChangeController,
+    verifyContactChangeController,
 } from './auth.controller';
 import { validate } from '../../middleware/validate.middleware';
 import {
@@ -12,11 +16,35 @@ import {
     logoutSchema,
     changePasswordSchema,
     forgotPasswordSchema,
-    resetPasswordSchema
+    resetPasswordSchema,
+    patchMeProfileSchema,
+    contactChangeRequestSchema,
+    contactChangeVerifySchema,
 } from './auth.dto';
 import { authMiddleware } from '../../middleware/auth.middleware';
 
 const router = Router();
+
+/** Thông tin tài khoản đang đăng nhập + cập nhật profile / đổi email-SĐT (OTP) */
+router.get('/me', authMiddleware, getMeController);
+router.patch(
+    '/me/profile',
+    authMiddleware,
+    validate(patchMeProfileSchema),
+    patchMeProfileController,
+);
+router.post(
+    '/me/contact-change/request',
+    authMiddleware,
+    validate(contactChangeRequestSchema),
+    requestContactChangeController,
+);
+router.post(
+    '/me/contact-change/verify',
+    authMiddleware,
+    validate(contactChangeVerifySchema),
+    verifyContactChangeController,
+);
 
 /**
  * @swagger

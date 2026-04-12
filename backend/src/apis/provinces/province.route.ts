@@ -68,6 +68,12 @@ const router = Router();
  *                         type: string
  *                         description: Ten hien thi tieng Viet chuan
  *                         example: Da Nang
+ *                       lat:
+ *                         type: number
+ *                         description: Vi do WGS84 (trung tam hanh chinh)
+ *                       lng:
+ *                         type: number
+ *                         description: Kinh do WGS84
  *             examples:
  *               fullList:
  *                 summary: Khong truyen search

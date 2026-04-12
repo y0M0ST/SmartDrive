@@ -6,6 +6,11 @@ const validate_middleware_1 = require("../../middleware/validate.middleware");
 const auth_dto_1 = require("./auth.dto");
 const auth_middleware_1 = require("../../middleware/auth.middleware");
 const router = (0, express_1.Router)();
+/** Thông tin tài khoản đang đăng nhập + cập nhật profile / đổi email-SĐT (OTP) */
+router.get('/me', auth_middleware_1.authMiddleware, auth_controller_1.getMeController);
+router.patch('/me/profile', auth_middleware_1.authMiddleware, (0, validate_middleware_1.validate)(auth_dto_1.patchMeProfileSchema), auth_controller_1.patchMeProfileController);
+router.post('/me/contact-change/request', auth_middleware_1.authMiddleware, (0, validate_middleware_1.validate)(auth_dto_1.contactChangeRequestSchema), auth_controller_1.requestContactChangeController);
+router.post('/me/contact-change/verify', auth_middleware_1.authMiddleware, (0, validate_middleware_1.validate)(auth_dto_1.contactChangeVerifySchema), auth_controller_1.verifyContactChangeController);
 /**
  * @swagger
  * /api/auth/login:

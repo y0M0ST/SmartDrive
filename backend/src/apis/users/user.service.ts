@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { Brackets, In, IsNull } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { User } from '../../entities/user.entity';
+import { DriverProfile } from '../../entities/driver-profile.entity';
 import { Trip } from '../../entities/trip.entity';
 import { TripStatus } from '../../common/constants/enums';
 import { CreateUserInput, UpdateUserInput, GetUserQuery } from './user.dto';
@@ -24,11 +25,11 @@ const ROLES = {
     VIEWER: 'VIEWER',
 } as const;
 
-const AGENCY_ADMIN_CREATEABLE_ROLES: Set<string> = new Set([
-    ROLES.DISPATCHER,
-    ROLES.DRIVER,
-    ROLES.VIEWER,
-]);
+/** Agency Admin chỉ được tạo tài xế (role thấp hơn, vận hành thực tế). */
+const AGENCY_ADMIN_CREATEABLE_ROLES: Set<string> = new Set([ROLES.DRIVER]);
+
+/** Super Admin chỉ được tạo Quản lý nhà xe (AGENCY_ADMIN) qua API users. */
+const SUPER_ADMIN_CREATABLE_USER_ROLES: Set<string> = new Set([ROLES.AGENCY_ADMIN]);
 
 function ensureAdminActor(actor: ActorContext): void {
     if (actor.role !== ROLES.SUPER_ADMIN && actor.role !== ROLES.AGENCY_ADMIN) {
@@ -48,7 +49,7 @@ async function resolveRoleById(roleId: string): Promise<Role> {
     return role;
 }
 
-async function assertUniqueEmailPhoneByAgency(
+export async function assertUniqueEmailPhoneByAgency(
     agencyId: string | null,
     email?: string,
     phone?: string,
@@ -165,8 +166,35 @@ export const getUsers = async (query: GetUserQuery, actor: ActorContext) => {
         .take(limit)
         .getManyAndCount();
 
+    const profileRepo = AppDataSource.getRepository(DriverProfile);
+    const ids = users.map((u) => u.id);
+    const profiles =
+        ids.length > 0
+            ? await profileRepo.find({
+                  where: { user_id: In(ids) },
+                  select: ['user_id', 'driver_code'],
+              })
+            : [];
+    const profileByUser = new Map(
+        profiles.map((p) => [p.user_id, p.driver_code] as const),
+    );
+
+    const data = users.map((u) => ({
+        id: u.id,
+        full_name: u.full_name,
+        email: u.email,
+        phone: u.phone,
+        status: u.status,
+        created_at: u.created_at,
+        last_login_at: u.last_login_at,
+        agency_id: u.agency_id,
+        role: u.role,
+        driver_code: profileByUser.get(u.id) ?? null,
+        has_driver_profile: profileByUser.has(u.id),
+    }));
+
     return {
-        data: users,
+        data,
         meta: {
             total,
             currentPage: page,
@@ -188,6 +216,16 @@ export const createUser = async (input: CreateUserInput, actor: ActorContext) =>
         !AGENCY_ADMIN_CREATEABLE_ROLES.has(role.name)
     ) {
         throw new AppError('Agency admin khong duoc tao role nay.', 403);
+    }
+
+    if (
+        actor.role === ROLES.SUPER_ADMIN &&
+        !SUPER_ADMIN_CREATABLE_USER_ROLES.has(role.name)
+    ) {
+        throw new AppError(
+            'Super admin chi duoc tao tai khoan Quan ly nha xe (AGENCY_ADMIN).',
+            403,
+        );
     }
 
     const targetAgencyId =
@@ -272,6 +310,12 @@ export const updateUser = async (
             !AGENCY_ADMIN_CREATEABLE_ROLES.has(targetRole.name)
         ) {
             throw new AppError('Agency admin khong duoc gan role nay.', 403);
+        }
+        if (
+            actor.role === ROLES.SUPER_ADMIN &&
+            !SUPER_ADMIN_CREATABLE_USER_ROLES.has(targetRole.name)
+        ) {
+            throw new AppError('Super admin chi duoc gan role AGENCY_ADMIN.', 403);
         }
     }
 

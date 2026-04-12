@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { driverApi } from "@/services/driverApi"; // Sử dụng API riêng cho Driver
+import { adminApi } from "@/services/adminApi";
 import { toast } from "sonner";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
@@ -21,6 +22,7 @@ export default function DriverProfilePage() {
 
   const [formData, setFormData] = useState({
   full_name: '', 
+  email: '',
   phone: '', 
   license_number: '', 
   agency_id: '', // Thêm trường này vào form
@@ -32,9 +34,8 @@ export default function DriverProfilePage() {
     setLoading(true);
     try {
       // Gọi API lấy danh sách hồ sơ từ file driverApi mới
-      const res = await driverApi.getProfiles({ search: searchQuery });
-      // Dựa trên Swagger: Dữ liệu nằm trong res.data.data
-      const data = res.data?.data || [];
+      const res = await driverApi.getUsers({ search: searchQuery, limit: 100 });
+      const data = res.data?.data?.data || [];
       setDrivers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Lỗi fetch:", error);
@@ -68,12 +69,20 @@ export default function DriverProfilePage() {
       // targetAgencyId = formData.agency_id; 
     }
 
+    const rolesRes = await adminApi.getRoles();
+    const roles = rolesRes.data?.data || [];
+    const driverRoleId = roles.find((r: any) => r.name === "DRIVER")?.id;
+    if (!driverRoleId) {
+      toast.error("Không tìm thấy role DRIVER từ API /roles");
+      return;
+    }
+
     const payload = {
       full_name: formData.full_name,
+      email: formData.email,
       phone: formData.phone,
-      license_number: formData.license_number || `GPLX${Date.now()}`,
-      agency_id: targetAgencyId, // PHẢI LÀ ID CỦA AGENCY, KHÔNG ĐƯỢC LẤY ID CỦA ADMIN
-      status: "active"
+      role_id: driverRoleId,
+      agency_id: targetAgencyId,
     };
 
     console.log("PAYLOAD GỬI ĐI:", payload);
@@ -83,13 +92,14 @@ export default function DriverProfilePage() {
       return;
     }
 
-    const res = await driverApi.createProfile(payload);
+    const res = await driverApi.createUser(payload);
     
     toast.success("Tạo hồ sơ tài xế thành công!");
     setIsDialogOpen(false);
     fetchDrivers();
 setFormData({ 
   full_name: '', 
+  email: '',
   phone: '', 
   license_number: '', 
   agency_id: '', // Thêm dòng này để hết lỗi đỏ
@@ -187,6 +197,15 @@ setFormData({
                 value={formData.phone} 
                 onChange={e => setFormData({...formData, phone: e.target.value})} 
                 className="rounded-xl border-slate-200 focus:ring-blue-500" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-bold text-slate-700 dark:text-slate-300">Email *</Label>
+              <Input
+                placeholder="VD: driver01@example.com"
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
+                className="rounded-xl border-slate-200 focus:ring-blue-500"
               />
             </div>
             <div className="space-y-2">

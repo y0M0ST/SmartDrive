@@ -57,3 +57,38 @@ export const resetPasswordSchema = z.object({
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>['body'];
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>['body'];
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>['body'];
+
+/** Cập nhật họ tên (không OTP) */
+export const patchMeProfileSchema = z.object({
+    body: z.object({
+        full_name: z.string().min(1, 'Họ tên không được để trống').max(200).trim(),
+    }),
+});
+
+export type PatchMeProfileInput = z.infer<typeof patchMeProfileSchema>['body'];
+
+/** Bước 1: yêu cầu OTP — đổi email (gửi OTP tới email mới) hoặc đổi SĐT (gửi OTP tới email hiện tại) */
+export const contactChangeRequestSchema = z.object({
+    body: z.discriminatedUnion('kind', [
+        z.object({
+            kind: z.literal('EMAIL'),
+            newEmail: z.string().trim().toLowerCase().email('Email không hợp lệ'),
+        }),
+        z.object({
+            kind: z.literal('PHONE'),
+            newPhone: z.string().min(10, 'Số điện thoại không hợp lệ').max(20).trim(),
+        }),
+    ]),
+});
+
+export type ContactChangeRequestInput = z.infer<typeof contactChangeRequestSchema>['body'];
+
+/** Bước 2: xác nhận OTP — giá trị mới lấy từ DB (không gửi lại từ client) */
+export const contactChangeVerifySchema = z.object({
+    body: z.object({
+        kind: z.enum(['EMAIL', 'PHONE']),
+        otp: z.string().regex(/^\d{6}$/, 'Mã OTP phải gồm đúng 6 chữ số'),
+    }),
+});
+
+export type ContactChangeVerifyInput = z.infer<typeof contactChangeVerifySchema>['body'];

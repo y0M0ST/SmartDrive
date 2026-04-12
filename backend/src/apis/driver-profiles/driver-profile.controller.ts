@@ -58,7 +58,7 @@ export const getProfile = catchAsync(async (req: Request, res: Response) => {
         req.params.userId as string,
         getActor(req),
     );
-    if (!result) throw new Error('Tài xế này chưa có hồ sơ');
+    if (!result) throw new AppError('Tai xe nay chua co ho so.', 404);
 
     res.status(200).json(ServiceResponse.success('Lấy hồ sơ thành công', result));
 });

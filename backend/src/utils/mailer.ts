@@ -65,3 +65,36 @@ export const sendNewAccountCredentialsEmail = async (
 
   await transporter.sendMail(mailOptions);
 };
+
+/** OTP đổi email / SĐT (Profile) — gửi tới hộp thư người nhận `toEmail`. */
+export const sendProfileContactChangeOtpEmail = async (
+  toEmail: string,
+  fullName: string,
+  code: string,
+  kind: 'email' | 'phone',
+  newValueLabel: string,
+) => {
+  const transporter = createMailerTransport();
+  const purpose =
+    kind === 'email'
+      ? 'xác nhận địa chỉ email mới cho tài khoản SmartDrive của bạn'
+      : 'xác nhận thay đổi số điện thoại cho tài khoản SmartDrive của bạn';
+  const mailOptions = {
+    from: process.env.MAIL_FROM,
+    to: toEmail,
+    subject:
+      kind === 'email'
+        ? '[SmartDrive] Mã xác nhận đổi email'
+        : '[SmartDrive] Mã xác nhận đổi số điện thoại',
+    html: `
+      <h3>Xin chào ${fullName},</h3>
+      <p>Bạn đã yêu cầu ${purpose}.</p>
+      <p><strong>Giá trị mới:</strong> ${newValueLabel}</p>
+      <p>Mã xác nhận gồm 6 chữ số (hiệu lực 15 phút):</p>
+      <p style="font-size: 28px; letter-spacing: 6px; font-weight: bold;">${code}</p>
+      <p>Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email và đổi mật khẩu nếu nghi ngờ tài khoản bị lộ.</p>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
