@@ -2,8 +2,8 @@
   "name": "smartdrive",
   "private": true,
   "workspaces": [
-    "frontend",
-    "backend"
+    "backend",
+    "frontend"
   ],
   "scripts": {
     "dev:be": "npm run dev --workspace=backend",
@@ -12,8 +12,5 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "sonner": "^2.0.7"
   }
 }
