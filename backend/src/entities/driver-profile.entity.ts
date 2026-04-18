@@ -28,6 +28,10 @@ export class DriverProfile extends BaseEntity {
     @Column({ type: 'text', nullable: true })
     face_encoding: string; // Lưu mảng vector embedding cực dài, nên dùng text
 
+    /** Khóa điểm danh Face ID (US_18) — agency cần can thiệp để mở. */
+    @Column({ type: 'boolean', default: false })
+    is_locked: boolean;
+
     // --- Quan hệ (Relations) ---
 
     // Quan hệ 1-1: Một User chỉ có 1 Profile tài xế
