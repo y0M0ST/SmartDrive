@@ -1,4 +1,4 @@
-import { Phone } from "lucide-react";
+import { Camera, Phone, Play, ShieldAlert } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,12 @@ type DriverTripDetailDialogProps = {
   onOpenChange: (open: boolean) => void;
   trip: DriverPortalTrip | null;
   resolveProvinceName: (code: string) => string;
+  /** `null` = đang kiểm tra với BE. */
+  hasFaceTemplate: boolean | null;
+  /** Điểm danh Face ID bị khóa (US_18). */
+  faceCheckinLocked: boolean;
+  onRegisterFace: () => void;
+  onStartTrip: (trip: DriverPortalTrip) => void;
 };
 
 function formatIso(iso: string | null | undefined): string {
@@ -42,6 +48,10 @@ export function DriverTripDetailDialog({
   onOpenChange,
   trip,
   resolveProvinceName,
+  hasFaceTemplate,
+  faceCheckinLocked,
+  onRegisterFace,
+  onStartTrip,
 }: DriverTripDetailDialogProps) {
   if (!trip) {
     return <Dialog open={false} onOpenChange={onOpenChange} />;
@@ -106,6 +116,46 @@ export function DriverTripDetailDialog({
               <p className="mt-2 text-rose-600 dark:text-rose-400">Lý do hủy: {trip.cancel_reason}</p>
             ) : null}
           </section>
+
+          {faceCheckinLocked ? (
+            <section
+              className="flex gap-3 rounded-xl border-4 border-red-800 bg-red-950 p-3 text-red-50 shadow-inner"
+              role="alert"
+            >
+              <ShieldAlert className="mt-0.5 size-7 shrink-0 text-red-400" strokeWidth={2} aria-hidden />
+              <p className="text-xs font-semibold leading-relaxed">
+                Điểm danh khuôn mặt đang bị khóa. Liên hệ nhà xe / Agency để mở khóa trước khi bắt đầu chuyến.
+              </p>
+            </section>
+          ) : null}
+
+          <div className="flex flex-col gap-2">
+            {hasFaceTemplate === false && !faceCheckinLocked ? (
+              <Button type="button" className="w-full gap-2" variant="secondary" onClick={onRegisterFace}>
+                <Camera className="size-4" aria-hidden />
+                Đăng ký khuôn mặt
+              </Button>
+            ) : null}
+
+            {trip.status === "SCHEDULED" ? (
+              <Button
+                type="button"
+                className="w-full gap-2"
+                disabled={hasFaceTemplate !== true || faceCheckinLocked}
+                onClick={() => onStartTrip(trip)}
+                title={
+                  faceCheckinLocked
+                    ? "Điểm danh khuôn mặt đang bị khóa. Liên hệ nhà xe để mở khóa."
+                    : hasFaceTemplate !== true
+                      ? "Vui lòng đăng ký khuôn mặt trước khi bắt đầu chuyến."
+                      : undefined
+                }
+              >
+                <Play className="size-4" aria-hidden />
+                Bắt đầu chuyến đi
+              </Button>
+            ) : null}
+          </div>
 
           {callHref ? (
             <Button type="button" className="w-full gap-2" asChild>

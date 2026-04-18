@@ -15,8 +15,9 @@ export class TripCheckin extends CoreEntity {
     @Column({ type: 'uuid' })
     driver_id: string;
 
-    @Column({ type: 'uuid' })
-    device_id: string;
+    /** Nullable: điểm danh từ app tài xế (Face ID) có thể không gắn bản ghi `devices`. */
+    @Column({ type: 'uuid', nullable: true })
+    device_id: string | null;
 
     @Column({ type: 'float', nullable: true })
     match_score: number; // Điểm khớp khuôn mặt (VD: 98.5%)
@@ -42,7 +43,7 @@ export class TripCheckin extends CoreEntity {
     @JoinColumn({ name: 'driver_id' })
     driver: User;
 
-    @ManyToOne(() => Device)
+    @ManyToOne(() => Device, { nullable: true })
     @JoinColumn({ name: 'device_id' })
-    device: Device;
+    device: Device | null;
 }
