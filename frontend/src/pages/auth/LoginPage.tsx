@@ -119,15 +119,11 @@ export default function LoginPage() {
         const role = user.role ?? "";
         const isAdmin = canAccessAdminDashboard(role);
 
+        toast.success("Đăng nhập thành công!");
         if (isAdmin) {
-          toast.success("Đăng nhập thành công!");
           navigate(getAdminHomePath(role), { replace: true });
         } else {
-          toast.success("Đăng nhập thành công", {
-            description:
-              "Tài khoản này không vào trang quản trị. Bạn được chuyển tới cổng tương ứng.",
-          });
-          navigate("/portal/driver", { replace: true });
+          navigate("/portal/driver/schedule", { replace: true });
         }
       } else {
         toast.error("Phản hồi đăng nhập không hợp lệ từ server.");
@@ -173,12 +169,12 @@ export default function LoginPage() {
       >
         <div className="space-y-2">
           <Label htmlFor="email" className="font-semibold text-foreground">
-            Tên đăng nhập (Email)
+            Email đăng nhập
           </Label>
           <Input
             id="email"
             type="email"
-            placeholder="Nhập email công ty cấp..."
+            placeholder="Nhập địa chỉ email của bạn"
             autoComplete="email"
             {...register("email")}
             className={`bg-white/50 focus:bg-white/80 transition-all ${errors.email ? "border-red-500" : ""}`}

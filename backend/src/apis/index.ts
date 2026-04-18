@@ -7,9 +7,15 @@ import driverProfileRoutes from './driver-profiles/driver-profile.route';
 import vehicleRoutes from './vehicles/vehicle.route';
 import routeRoutes from './routes/route.route';
 import provinceRoutes from './provinces/province.route';
+import tripRoutes from './trips/trip.route';
+import violationRoutes from './ai-violations/violation.route';
+import driverPortalRoutes from './driver-portal/driver-portal.route';
 
 const router = Router();
 router.use('/auth', authRoutes);
+router.use('/driver', driverPortalRoutes);
+router.use('/agencies/violations', violationRoutes);
+router.use('/agencies/trips', tripRoutes);
 router.use('/agencies', agencyRoutes);
 router.use('/users', userRoutes);
 router.use('/roles', roleRoutes);
