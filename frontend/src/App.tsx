@@ -24,10 +24,16 @@ import DriverManagement from "./pages/DriverManagement";
 import VehicleManagement from "./pages/VehicleManagement";
 import AgencyDashboardPage from "./pages/agency/AgencyDashboardPage";
 import AgencyPlaceholderPage from "./pages/agency/AgencyPlaceholderPage";
+import TripListPage from "./pages/trips/TripListPage";
+import ViolationListPage from "./pages/violations/ViolationListPage";
 import SuperAdminOverviewPage from "./pages/super-admin/SuperAdminOverviewPage";
 import SuperAdminAgenciesPage from "./pages/super-admin/SuperAdminAgenciesPage";
 import SuperAdminPlansPage from "./pages/super-admin/SuperAdminPlansPage";
 import SuperAdminLogsPage from "./pages/super-admin/SuperAdminLogsPage";
+import DriverLayout from "./layouts/DriverLayout";
+import DriverSchedulePage from "./pages/portal/driver/DriverSchedulePage";
+import DriverNotificationsPage from "./pages/portal/driver/DriverNotificationsPage";
+import DriverMePage from "./pages/portal/driver/DriverMePage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem("access_token");
@@ -51,7 +57,7 @@ const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
     if (!token) return;
     const role = readStoredUserRole();
     if (!canAccessAdminDashboard(role)) {
-      navigate("/portal/driver", { replace: true });
+      navigate("/portal/driver/schedule", { replace: true });
     }
   }, [navigate]);
 
@@ -98,7 +104,30 @@ function AdminHomeRedirect() {
 function AppRootRedirect() {
   const token = localStorage.getItem("access_token");
   if (!token) return <Navigate to="/login" replace />;
-  return <Navigate to={getAdminHomePath(readStoredUserRole())} replace />;
+  const role = readStoredUserRole();
+  if (role === "DRIVER") return <Navigate to="/portal/driver/schedule" replace />;
+  return <Navigate to={getAdminHomePath(role)} replace />;
+}
+
+/** Chỉ tài khoản DRIVER — admin đẩy về khu quản trị. */
+function DriverOnlyRoute({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const role = readStoredUserRole();
+
+  useEffect(() => {
+    if (!role) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    if (canAccessAdminDashboard(role)) {
+      navigate(getAdminHomePath(role), { replace: true });
+    } else if (role !== "DRIVER") {
+      navigate("/login", { replace: true });
+    }
+  }, [role, navigate]);
+
+  if (!role || canAccessAdminDashboard(role) || role !== "DRIVER") return null;
+  return <>{children}</>;
 }
 
 const AuthSynchronizer = ({ children }: { children: React.ReactNode }) => {
@@ -160,14 +189,8 @@ function App() {
                 <Route path="drivers" element={<DriverManagement />} />
                 <Route path="vehicles" element={<VehicleManagement />} />
                 <Route path="accounts" element={<Navigate to="/admin/drivers" replace />} />
-                <Route
-                  path="trips"
-                  element={<AgencyPlaceholderPage title="Quản lí chuyến đi" />}
-                />
-                <Route
-                  path="violations"
-                  element={<AgencyPlaceholderPage title="Lịch sử vi phạm" />}
-                />
+                <Route path="trips" element={<TripListPage />} />
+                <Route path="violations" element={<ViolationListPage />} />
                 <Route
                   path="ratings"
                   element={<AgencyPlaceholderPage title="Đánh giá và xếp hạng" />}
@@ -183,10 +206,17 @@ function App() {
               path="/portal/driver"
               element={
                 <ProtectedRoute>
-                  <div className="p-10 text-3xl dark:text-white">Cổng thông tin tài xế (Driver Portal)</div>
+                  <DriverOnlyRoute>
+                    <DriverLayout />
+                  </DriverOnlyRoute>
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route index element={<Navigate to="schedule" replace />} />
+              <Route path="schedule" element={<DriverSchedulePage />} />
+              <Route path="notifications" element={<DriverNotificationsPage />} />
+              <Route path="me" element={<DriverMePage />} />
+            </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

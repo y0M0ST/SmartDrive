@@ -118,7 +118,7 @@ export const changeVehicleStatus = async (agencyId: string, vehicleId: string, s
 
     // Nếu xe đang chạy ngoài đường thì không được cho đi bảo dưỡng ngang xương
     if (vehicle.status === VehicleStatus.IN_SERVICE && status !== VehicleStatus.IN_SERVICE) {
-        throw new AppError('Xe đang trong chuyến đi (IN_SERVICE), không thể đổi trạng thái ngay lúc này!', 400);
+        throw new AppError('Xe đang trong chuyến đi, không thể đổi trạng thái ngay lúc này!', 400);
     }
 
     vehicle.status = status;

@@ -1,9 +1,10 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from './base/base.entity';
 import { Agency } from './agency.entity';
 import { Route } from './route.entity';
 import { Vehicle } from './vehicle.entity';
 import { User } from './user.entity';
+import { AiViolation } from './ai-violation.entity';
 import { TripStatus } from '../common/constants/enums';
 
 @Entity('trips')
@@ -60,4 +61,7 @@ export class Trip extends BaseEntity {
     @ManyToOne(() => User)
     @JoinColumn({ name: 'driver_id' })
     driver: User; // User này mang role là Tài xế
+
+    @OneToMany(() => AiViolation, (violation) => violation.trip)
+    ai_violations: AiViolation[];
 }
