@@ -10,10 +10,12 @@ import provinceRoutes from './provinces/province.route';
 import tripRoutes from './trips/trip.route';
 import violationRoutes from './ai-violations/violation.route';
 import driverPortalRoutes from './driver-portal/driver-portal.route';
+import deviceViolationRoutes from './device-violations/device-violation.route';
 
 const router = Router();
 router.use('/auth', authRoutes);
 router.use('/driver', driverPortalRoutes);
+router.use('/device', deviceViolationRoutes);
 router.use('/agencies/violations', violationRoutes);
 router.use('/agencies/trips', tripRoutes);
 router.use('/agencies', agencyRoutes);
