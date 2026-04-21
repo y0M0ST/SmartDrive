@@ -24,6 +24,10 @@ BACKEND_URL = os.getenv(
     "SMARTDRIVE_DEVICE_INGEST_URL",
     "http://localhost:3000/api/device/violations",
 )
+GPS_INGEST_URL = os.getenv(
+    "SMARTDRIVE_DEVICE_GPS_URL",
+    "http://localhost:3000/api/device/gps",
+)
 API_KEY = os.getenv("MASTER_DEVICE_API_KEY", "")
 
 REQUEST_TIMEOUT_SEC = float(os.getenv("SMARTDRIVE_DEVICE_REQUEST_TIMEOUT", "5"))
@@ -110,4 +114,67 @@ def send_violation(
         return False
     except Exception as e:  # noqa: BLE001 — không để crash luồng gọi
         logger.exception("Ingest vi phạm lỗi không mong đợi: %s", e)
+        return False
+
+
+def send_gps_point(
+    trip_id: str,
+    latitude: float,
+    longitude: float,
+    speed: float,
+    heading: Optional[float] = None,
+) -> bool:
+    """
+    US_09 — POST JSON tới `/api/device/gps` (header `x-device-api-key`).
+
+    :return: True nếu HTTP 2xx; False nếu lỗi (không ném exception ra ngoài).
+    """
+    if not API_KEY:
+        logger.warning(
+            "MASTER_DEVICE_API_KEY chưa được cấu hình — bỏ qua gửi GPS (thiết lập trong .env).",
+        )
+        return False
+
+    tid = (trip_id or "").strip()
+    if not tid:
+        logger.warning("send_gps_point: trip_id rỗng.")
+        return False
+
+    payload: dict[str, Any] = {
+        "trip_id": tid,
+        "latitude": float(latitude),
+        "longitude": float(longitude),
+        "speed": float(speed),
+    }
+    if heading is not None:
+        payload["heading"] = float(heading)
+
+    headers = {
+        "x-device-api-key": API_KEY,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        resp = requests.post(
+            GPS_INGEST_URL,
+            json=payload,
+            headers=headers,
+            timeout=REQUEST_TIMEOUT_SEC,
+        )
+        if 200 <= resp.status_code < 300:
+            return True
+        logger.warning(
+            "Ingest GPS HTTP %s: %s",
+            resp.status_code,
+            (resp.text or "")[:500],
+        )
+        return False
+    except requests.Timeout:
+        logger.warning("Ingest GPS timeout sau %ss — bỏ qua.", REQUEST_TIMEOUT_SEC)
+        return False
+    except requests.RequestException as e:
+        logger.warning("Ingest GPS lỗi mạng: %s", e)
+        return False
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Ingest GPS lỗi không mong đợi: %s", e)
         return False

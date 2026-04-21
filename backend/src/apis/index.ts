@@ -11,11 +11,15 @@ import tripRoutes from './trips/trip.route';
 import violationRoutes from './ai-violations/violation.route';
 import driverPortalRoutes from './driver-portal/driver-portal.route';
 import deviceViolationRoutes from './device-violations/device-violation.route';
+import deviceGpsRoutes from './device-gps/device-gps.route';
+import tripTrackingRoutes from './trip-tracking/trip-tracking.route';
 
 const router = Router();
 router.use('/auth', authRoutes);
 router.use('/driver', driverPortalRoutes);
 router.use('/device', deviceViolationRoutes);
+router.use('/device', deviceGpsRoutes);
+router.use('/trips', tripTrackingRoutes);
 router.use('/agencies/violations', violationRoutes);
 router.use('/agencies/trips', tripRoutes);
 router.use('/agencies', agencyRoutes);

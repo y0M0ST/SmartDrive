@@ -5,7 +5,19 @@ import { Role } from '../../entities/role.entity';
 import { User } from '../../entities/user.entity';
 import { UserStatus } from '../../common/constants/enums';
 
-const DEFAULT_PASSWORD = '@Password123';
+const DEFAULT_PASSWORD = process.env.DEFAULT_PASSWORD?.trim() || '@Password123';
+
+/**
+ * Tao email seed khong gan ten ca nhan trong code.
+ * - SEED_USER_EMAIL_DOMAIN: domain (mac dinh example.com — RFC reserved, khong can hop le voi inbox that)
+ * - SEED_USER_EMAIL_LOCAL_PREFIX: neu dat (vd catch-all), local = prefix+localKey@domain; bo trong thi localKey@domain
+ */
+function buildSeedEmail(localKey: string): string {
+    const domain = (process.env.SEED_USER_EMAIL_DOMAIN || 'example.com').trim() || 'example.com';
+    const prefix = (process.env.SEED_USER_EMAIL_LOCAL_PREFIX || '').trim();
+    const local = prefix ? `${prefix}+${localKey}` : localKey;
+    return `${local}@${domain}`;
+}
 
 type UserSeedInput = {
     username: string;
@@ -22,7 +34,7 @@ function buildUsersSeed(): UserSeedInput[] {
         {
             username: 'superadmin',
             full_name: 'Super Admin',
-            email: 'phucnguyen2812kuwin+admin.superadmin@zulieu9.com',
+            email: buildSeedEmail('admin.superadmin'),
             phone: '0988000001',
             roleName: 'SUPER_ADMIN',
             status: UserStatus.ACTIVE,
@@ -34,7 +46,7 @@ function buildUsersSeed(): UserSeedInput[] {
         users.push({
             username: `agencyadmin${suffix}`,
             full_name: `Agency Admin ${suffix}`,
-            email: `phucnguyen2812kuwin+agency.admin${suffix}@zulieu9.com`,
+            email: buildSeedEmail(`agency.admin${suffix}`),
             phone: `09881${String(i).padStart(5, '0')}`,
             roleName: 'AGENCY_ADMIN',
             agencyCode: `AGENCY_${suffix}`,
@@ -47,7 +59,7 @@ function buildUsersSeed(): UserSeedInput[] {
         users.push({
             username: `dispatcher${suffix}`,
             full_name: `Dispatcher ${suffix}`,
-            email: `phucnguyen2812kuwin+agency.dispatcher${suffix}@zulieu9.com`,
+            email: buildSeedEmail(`agency.dispatcher${suffix}`),
             phone: `09882${String(i).padStart(5, '0')}`,
             roleName: 'DISPATCHER',
             agencyCode: `AGENCY_${String(((i - 1) % 10) + 1).padStart(2, '0')}`,
@@ -60,7 +72,7 @@ function buildUsersSeed(): UserSeedInput[] {
         users.push({
             username: `driver${suffix}`,
             full_name: `Driver ${suffix}`,
-            email: `phucnguyen2812kuwin+driver${suffix}@zulieu9.com`,
+            email: buildSeedEmail(`driver${suffix}`),
             phone: `09883${String(i).padStart(5, '0')}`,
             roleName: 'DRIVER',
             agencyCode: `AGENCY_${String(((i - 1) % 10) + 1).padStart(2, '0')}`,
@@ -73,7 +85,7 @@ function buildUsersSeed(): UserSeedInput[] {
         users.push({
             username: `viewer${suffix}`,
             full_name: `Viewer ${suffix}`,
-            email: `phucnguyen2812kuwin+agency.viewer${suffix}@zulieu9.com`,
+            email: buildSeedEmail(`agency.viewer${suffix}`),
             phone: `09884${String(i).padStart(5, '0')}`,
             roleName: 'VIEWER',
             agencyCode: `AGENCY_${String(((i - 1) % 10) + 1).padStart(2, '0')}`,
