@@ -19,6 +19,20 @@ export type TripGpsSocketPayload = {
     recorded_at: string;
 };
 
+/** US_10 — payload chuông cảnh báo realtime (đủ để FE hiển thị card). */
+export type AiViolationSocketPayload = {
+    violation_id: string;
+    trip_id: string;
+    trip_code: string | null;
+    violation_type: string;
+    license_plate: string;
+    driver_name: string;
+    occurred_at: string;
+    image_url: string;
+    latitude: number | null;
+    longitude: number | null;
+};
+
 /**
  * US_09 — Chỉ phòng `agency_room:{agency_id}` nhận cập nhật (không broadcast toàn cục).
  */
@@ -34,5 +48,23 @@ export const emitTripGpsUpdateToAgencyRoom = (
         io.to(room).emit('trip_gps_update', payload);
     } catch (err) {
         console.warn('[Socket.io] emit trip_gps_update that bai:', err);
+    }
+};
+
+/**
+ * US_10 — Cảnh báo vi phạm AI theo phòng nhà xe (cùng cơ chế US_09).
+ */
+export const emitAiViolationAlertToAgencyRoom = (
+    agencyId: string,
+    payload: AiViolationSocketPayload,
+): void => {
+    if (!agencyId || !io) {
+        return;
+    }
+    const room = buildAgencyRoomId(agencyId);
+    try {
+        io.to(room).emit('ai_violation_alert', payload);
+    } catch (err) {
+        console.warn('[Socket.io] emit ai_violation_alert that bai:', err);
     }
 };

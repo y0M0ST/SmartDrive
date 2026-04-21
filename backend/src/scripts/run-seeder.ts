@@ -8,7 +8,7 @@ async function runSeeder(): Promise<void> {
         console.log('Seeder database connected');
 
         await runAllSeeders();
-        console.log('Seeding completed: roles, permissions, role_permissions');
+        console.log('Seeding completed: roles, permissions, role_permissions, agencies, users, violation_configs');
     } catch (error) {
         console.error('Seeding failed:', error);
         process.exitCode = 1;

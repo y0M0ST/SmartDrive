@@ -1,34 +1,32 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index, UpdateDateColumn } from 'typeorm';
 import { CoreEntity } from './base/base.entity';
 import { User } from './user.entity';
+import { Agency } from './agency.entity';
 
+/**
+ * US_13 — Điểm an toàn tích lũy theo tháng (VN `YYYY-MM`), phạm vi nhà xe.
+ */
 @Entity('driver_scores')
-@Index(['driver_id', 'month', 'year'], { unique: true }) // 1 tài xế chỉ có 1 bảng điểm cho 1 tháng
-@Index(['year', 'month']) // Dùng để truy xuất BXH tháng của toàn nhà xe
+@Index(['agency_id', 'driver_id', 'evaluation_month'], { unique: true })
 export class DriverScore extends CoreEntity {
+    @Column({ type: 'uuid' })
+    agency_id: string;
+
     @Column({ type: 'uuid' })
     driver_id: string;
 
-    @Column({ type: 'int' })
-    month: number;
-
-    @Column({ type: 'int' })
-    year: number;
+    /** Theo lịch VN, ví dụ `2026-04` */
+    @Column({ type: 'varchar', length: 7 })
+    evaluation_month: string;
 
     @Column({ type: 'int', default: 0 })
-    total_trips: number;
+    total_violations: number;
 
     @Column({ type: 'int', default: 0 })
-    total_drowsy: number;
-
-    @Column({ type: 'int', default: 0 })
-    total_distracted: number;
-
-    @Column({ type: 'int', default: 0 })
-    total_points_deducted: number;
+    total_deducted_points: number;
 
     @Column({ type: 'int', default: 100 })
-    final_score: number; // Clamp từ 0 -> 100
+    final_score: number;
 
     @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
     calculated_at: Date;
@@ -36,8 +34,11 @@ export class DriverScore extends CoreEntity {
     @UpdateDateColumn({ type: 'timestamptz' })
     updated_at: Date;
 
-    // --- Quan hệ ---
     @ManyToOne(() => User)
     @JoinColumn({ name: 'driver_id' })
     driver: User;
+
+    @ManyToOne(() => Agency)
+    @JoinColumn({ name: 'agency_id' })
+    agency: Agency;
 }

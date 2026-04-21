@@ -34,7 +34,6 @@ export const logoutController = catchAsync(async (req: Request, res: Response) =
 });
 
 export const changePasswordController = catchAsync(async (req: Request, res: Response) => {
-    // GIẢ ĐỊNH: Bồ đã có authMiddleware gắn thông tin giải mã JWT vào req.user
     const userId = userIdFromReq(req);
 
     await authService.changePassword(userId, req.body);

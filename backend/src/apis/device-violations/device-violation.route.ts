@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { deviceAuthMiddleware } from '../../middleware/device-auth.middleware';
+import { validate } from '../../middleware/validate.middleware';
 import { uploadConfig } from '../../utils/upload';
 import * as deviceViolationController from './device-violation.controller';
+import * as deviceViolationJsonController from './device-violation-json.controller';
+import { deviceViolationJsonBodySchema } from './device-violation-json.dto';
 
 const router = Router();
 
@@ -56,6 +59,20 @@ router.post(
     deviceAuthMiddleware,
     uploadConfig.single('image'),
     deviceViolationController.postDeviceViolation,
+);
+
+/**
+ * @swagger
+ * /api/device/violation:
+ *   post:
+ *     summary: Ghi nhận vi phạm AI (JSON — US_10)
+ *     tags: [Device AI]
+ */
+router.post(
+    '/violation',
+    deviceAuthMiddleware,
+    validate(deviceViolationJsonBodySchema),
+    deviceViolationJsonController.postDeviceViolationJson,
 );
 
 export default router;

@@ -6,32 +6,18 @@ import { TripStatus } from '../../common/constants/enums';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
 import { uploadImageBufferToCloudinary } from '../../utils/cloudinary';
 import { emitAiViolationAlertByViolationId } from '../../socket/ai-violation-alert.emitter';
-import { applyDriverScoreOnNewViolation } from '../driver-scores/driver-score.service';
 import { resolveViolationConfigId } from './violation-config-query';
-import { deviceViolationMetadataSchema, type DeviceViolationMetadata } from './device-violation.dto';
+import { applyDriverScoreOnNewViolation } from '../driver-scores/driver-score.service';
+import type { DeviceViolationJsonBody } from './device-violation-json.dto';
 
-export type DeviceViolationIngestAck = {
+export type DeviceViolationJsonAck = {
     duplicate: boolean;
-    deviceEventId: string;
-    violationId: string;
-    imageUrl?: string;
+    device_event_id: string;
+    violation_id: string;
+    image_url?: string;
 };
 
-const parseMetadataJson = (dataJson: string): DeviceViolationMetadata => {
-    let raw: unknown;
-    try {
-        raw = JSON.parse(dataJson) as unknown;
-    } catch {
-        throw new BadRequestException('Field data không phải JSON hợp lệ.');
-    }
-    const parsed = deviceViolationMetadataSchema.safeParse(raw);
-    if (!parsed.success) {
-        throw new BadRequestException('Metadata không đúng định dạng.', parsed.error.flatten());
-    }
-    return parsed.data;
-};
-
-const buildIdempotentAck = async (deviceEventId: string): Promise<DeviceViolationIngestAck> => {
+const buildIdempotentAck = async (deviceEventId: string): Promise<DeviceViolationJsonAck> => {
     const violationRepo = AppDataSource.getRepository(AiViolation);
     const existing = await violationRepo.findOne({ where: { device_event_id: deviceEventId } });
     if (!existing) {
@@ -39,38 +25,56 @@ const buildIdempotentAck = async (deviceEventId: string): Promise<DeviceViolatio
     }
     return {
         duplicate: true,
-        deviceEventId,
-        violationId: existing.id,
-        imageUrl: existing.image_url,
+        device_event_id: deviceEventId,
+        violation_id: existing.id,
+        image_url: existing.image_url,
     };
 };
 
-/**
- * US_20 — Ingest vi phạm từ thiết bị (multipart: ảnh + metadata JSON).
- * Thứ tự: parse + idempotent → kiểm tra trip IN_PROGRESS → upload Cloudinary → lưu DB.
- */
-export const ingestDeviceViolation = async (
-    imageBuffer: Buffer,
-    dataJson: string,
-): Promise<{ message: string; data: DeviceViolationIngestAck }> => {
-    const meta = parseMetadataJson(dataJson);
+const decodeBase64ToBuffer = (raw: string): Buffer => {
+    const trimmed = raw.trim();
+    const dataUrl = /^data:image\/[\w+.-]+;base64,(.+)$/i.exec(trimmed);
+    const b64 = dataUrl ? dataUrl[1] : trimmed;
+    const buf = Buffer.from(b64, 'base64');
+    if (buf.length < 32) {
+        throw new BadRequestException('image_base64 không hợp lệ hoặc quá ngắn.');
+    }
+    return buf;
+};
 
+const resolveImageUrlFromBody = async (body: DeviceViolationJsonBody): Promise<string> => {
+    if (body.image_url?.trim()) {
+        return body.image_url.trim();
+    }
+    if (body.image_base64?.trim()) {
+        const buf = decodeBase64ToBuffer(body.image_base64);
+        return uploadImageBufferToCloudinary(buf, 'smartdrive/ai-violations');
+    }
+    throw new BadRequestException('Thiếu image_url hoặc image_base64.');
+};
+
+/**
+ * US_10 — Ingest JSON + idempotency + emit `ai_violation_alert` vào agency room.
+ */
+export const ingestDeviceViolationJson = async (
+    body: DeviceViolationJsonBody,
+): Promise<{ message: string; data: DeviceViolationJsonAck }> => {
     const violationRepo = AppDataSource.getRepository(AiViolation);
-    const existed = await violationRepo.findOne({ where: { device_event_id: meta.deviceEventId } });
+    const existed = await violationRepo.findOne({ where: { device_event_id: body.device_event_id } });
     if (existed) {
         return {
             message: 'Sự kiện đã được ghi nhận trước đó (ACK idempotent).',
             data: {
                 duplicate: true,
-                deviceEventId: meta.deviceEventId,
-                violationId: existed.id,
-                imageUrl: existed.image_url,
+                device_event_id: body.device_event_id,
+                violation_id: existed.id,
+                image_url: existed.image_url,
             },
         };
     }
 
     const tripRepo = AppDataSource.getRepository(Trip);
-    const trip = await tripRepo.findOne({ where: { id: meta.tripId } });
+    const trip = await tripRepo.findOne({ where: { id: body.trip_id } });
     if (!trip) {
         throw new AppError('Không tìm thấy chuyến đi.', 404);
     }
@@ -80,8 +84,9 @@ export const ingestDeviceViolation = async (
         );
     }
 
-    const imageUrl = await uploadImageBufferToCloudinary(imageBuffer, 'smartdrive/ai-violations');
-    const configId = await resolveViolationConfigId(meta.type, meta.occurredAt);
+    const occurredAt = body.occurred_at ?? new Date();
+    const imageUrl = await resolveImageUrlFromBody(body);
+    const configId = await resolveViolationConfigId(body.violation_type, occurredAt);
     const now = new Date();
 
     const row = violationRepo.create({
@@ -90,12 +95,12 @@ export const ingestDeviceViolation = async (
         vehicle_id: trip.vehicle_id,
         device_id: null,
         config_id: configId,
-        device_event_id: meta.deviceEventId,
-        type: meta.type,
+        device_event_id: body.device_event_id,
+        type: body.violation_type,
         image_url: imageUrl,
-        latitude: meta.latitude ?? null,
-        longitude: meta.longitude ?? null,
-        occurred_at: meta.occurredAt,
+        latitude: body.latitude ?? null,
+        longitude: body.longitude ?? null,
+        occurred_at: occurredAt,
         sync_status: 'SYNCED',
         synced_at: now,
     });
@@ -106,7 +111,7 @@ export const ingestDeviceViolation = async (
         if (err instanceof QueryFailedError) {
             const code = (err as unknown as { driverError?: { code?: string } }).driverError?.code;
             if (code === '23505') {
-                const ack = await buildIdempotentAck(meta.deviceEventId);
+                const ack = await buildIdempotentAck(body.device_event_id);
                 return {
                     message: 'Sự kiện đã được ghi nhận trước đó (ACK idempotent).',
                     data: ack,
@@ -120,12 +125,12 @@ export const ingestDeviceViolation = async (
     await applyDriverScoreOnNewViolation(row.id);
 
     return {
-        message: 'Đã ghi nhận vi phạm AI và đồng bộ thành công.',
+        message: 'Đã ghi nhận vi phạm AI (JSON) và phát realtime.',
         data: {
             duplicate: false,
-            deviceEventId: meta.deviceEventId,
-            violationId: row.id,
-            imageUrl,
+            device_event_id: body.device_event_id,
+            violation_id: row.id,
+            image_url: imageUrl,
         },
     };
 };
