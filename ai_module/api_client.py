@@ -1,5 +1,6 @@
 """
-US_20 — Gửi sự kiện vi phạm AI lên Backend (multipart / device ingest).
+US_20 / US_10 — Gửi vi phạm AI lên Backend: multipart (`/api/device/violations`),
+JSON (`/api/device/violation`), GPS (`/api/device/gps`).
 
 Gọi từ luồng camera chính qua thread riêng để không block OpenCV.
 """
@@ -27,6 +28,10 @@ BACKEND_URL = os.getenv(
 GPS_INGEST_URL = os.getenv(
     "SMARTDRIVE_DEVICE_GPS_URL",
     "http://localhost:3000/api/device/gps",
+)
+VIOLATION_JSON_URL = os.getenv(
+    "SMARTDRIVE_DEVICE_VIOLATION_JSON_URL",
+    "http://localhost:3000/api/device/violation",
 )
 API_KEY = os.getenv("MASTER_DEVICE_API_KEY", "")
 
@@ -177,4 +182,93 @@ def send_gps_point(
         return False
     except Exception as e:  # noqa: BLE001
         logger.exception("Ingest GPS lỗi không mong đợi: %s", e)
+        return False
+
+
+def send_violation_json(
+    trip_id: str,
+    violation_type: str,
+    *,
+    image_base64: Optional[str] = None,
+    image_url: Optional[str] = None,
+    device_event_id: Optional[str] = None,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    occurred_at_iso: Optional[str] = None,
+) -> bool:
+    """
+    US_10 — POST JSON tới `/api/device/violation` (header `x-device-api-key`).
+
+    Phải cung cấp đúng một trong hai: `image_base64` hoặc `image_url`.
+
+    :return: True nếu HTTP 2xx; False nếu lỗi (không ném exception ra ngoài).
+    """
+    if not API_KEY:
+        logger.warning(
+            "MASTER_DEVICE_API_KEY chưa được cấu hình — bỏ qua gửi vi phạm JSON.",
+        )
+        return False
+
+    tid = (trip_id or "").strip()
+    if not tid:
+        logger.warning("send_violation_json: trip_id rỗng.")
+        return False
+
+    vt = (violation_type or "").strip().upper()
+    if vt not in _ALLOWED_TYPES:
+        logger.warning("send_violation_json: violation_type không hợp lệ: %r", violation_type)
+        return False
+
+    b64 = (image_base64 or "").strip() or None
+    url = (image_url or "").strip() or None
+    if bool(b64) == bool(url):
+        logger.warning("send_violation_json: cần đúng một trong image_base64 hoặc image_url.")
+        return False
+
+    eid = (device_event_id or "").strip() or uuid.uuid4().hex
+
+    payload: dict[str, Any] = {
+        "device_event_id": eid,
+        "trip_id": tid,
+        "violation_type": vt,
+    }
+    if b64:
+        payload["image_base64"] = b64
+    else:
+        payload["image_url"] = url
+    if lat is not None:
+        payload["latitude"] = float(lat)
+    if lng is not None:
+        payload["longitude"] = float(lng)
+    if occurred_at_iso:
+        payload["occurred_at"] = occurred_at_iso
+
+    headers = {
+        "x-device-api-key": API_KEY,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        resp = requests.post(
+            VIOLATION_JSON_URL,
+            json=payload,
+            headers=headers,
+            timeout=REQUEST_TIMEOUT_SEC,
+        )
+        if 200 <= resp.status_code < 300:
+            return True
+        logger.warning(
+            "Ingest vi phạm JSON HTTP %s: %s",
+            resp.status_code,
+            (resp.text or "")[:500],
+        )
+        return False
+    except requests.Timeout:
+        logger.warning("Ingest vi phạm JSON timeout sau %ss.", REQUEST_TIMEOUT_SEC)
+        return False
+    except requests.RequestException as e:
+        logger.warning("Ingest vi phạm JSON lỗi mạng: %s", e)
+        return False
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Ingest vi phạm JSON lỗi không mong đợi: %s", e)
         return False
