@@ -2,12 +2,12 @@ import { QueryFailedError } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { AiViolation } from '../../entities/ai-violation.entity';
 import { Trip } from '../../entities/trip.entity';
-import { TripStatus } from '../../common/constants/enums';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
 import { uploadImageBufferToCloudinary } from '../../utils/cloudinary';
 import { emitAiViolationAlertByViolationId } from '../../socket/ai-violation-alert.emitter';
 import { applyDriverScoreOnNewViolation } from '../driver-scores/driver-score.service';
 import { resolveViolationConfigId } from './violation-config-query';
+import { assertTripAcceptsViolationOccurredWindow } from './device-violation-trip-window';
 import { deviceViolationMetadataSchema, type DeviceViolationMetadata } from './device-violation.dto';
 
 export type DeviceViolationIngestAck = {
@@ -47,7 +47,7 @@ const buildIdempotentAck = async (deviceEventId: string): Promise<DeviceViolatio
 
 /**
  * US_20 — Ingest vi phạm từ thiết bị (multipart: ảnh + metadata JSON).
- * Thứ tự: parse + idempotent → kiểm tra trip IN_PROGRESS → upload Cloudinary → lưu DB.
+ * Thứ tự: parse + idempotent → kiểm tra occurred_at trong khoảng chuyến (IN_PROGRESS/COMPLETED) → upload Cloudinary → lưu DB.
  */
 export const ingestDeviceViolation = async (
     imageBuffer: Buffer,
@@ -74,11 +74,7 @@ export const ingestDeviceViolation = async (
     if (!trip) {
         throw new AppError('Không tìm thấy chuyến đi.', 404);
     }
-    if (trip.status !== TripStatus.IN_PROGRESS) {
-        throw new BadRequestException(
-            `Chuyến đi không ở trạng thái IN_PROGRESS (hiện tại: ${trip.status}). Không ghi nhận vi phạm.`,
-        );
-    }
+    assertTripAcceptsViolationOccurredWindow(trip, meta.occurredAt);
 
     const imageUrl = await uploadImageBufferToCloudinary(imageBuffer, 'smartdrive/ai-violations');
     const configId = await resolveViolationConfigId(meta.type, meta.occurredAt);

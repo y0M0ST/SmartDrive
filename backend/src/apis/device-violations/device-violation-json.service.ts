@@ -2,12 +2,12 @@ import { QueryFailedError } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { AiViolation } from '../../entities/ai-violation.entity';
 import { Trip } from '../../entities/trip.entity';
-import { TripStatus } from '../../common/constants/enums';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
 import { uploadImageBufferToCloudinary } from '../../utils/cloudinary';
 import { emitAiViolationAlertByViolationId } from '../../socket/ai-violation-alert.emitter';
 import { resolveViolationConfigId } from './violation-config-query';
 import { applyDriverScoreOnNewViolation } from '../driver-scores/driver-score.service';
+import { assertTripAcceptsViolationOccurredWindow } from './device-violation-trip-window';
 import type { DeviceViolationJsonBody } from './device-violation-json.dto';
 
 export type DeviceViolationJsonAck = {
@@ -78,13 +78,9 @@ export const ingestDeviceViolationJson = async (
     if (!trip) {
         throw new AppError('Không tìm thấy chuyến đi.', 404);
     }
-    if (trip.status !== TripStatus.IN_PROGRESS) {
-        throw new BadRequestException(
-            `Chuyến đi không ở trạng thái IN_PROGRESS (hiện tại: ${trip.status}). Không ghi nhận vi phạm.`,
-        );
-    }
 
     const occurredAt = body.occurred_at ?? new Date();
+    assertTripAcceptsViolationOccurredWindow(trip, occurredAt);
     const imageUrl = await resolveImageUrlFromBody(body);
     const configId = await resolveViolationConfigId(body.violation_type, occurredAt);
     const now = new Date();
