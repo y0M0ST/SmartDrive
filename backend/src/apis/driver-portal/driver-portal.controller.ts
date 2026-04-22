@@ -3,7 +3,12 @@ import { catchAsync } from '../../utils/catchAsync';
 import { ServiceResponse } from '../../models/serviceResponse';
 import { AppError } from '../../common/errors/app-error';
 import * as driverPortalService from './driver-portal.service';
-import { getMyTripsQuerySchema } from './driver-portal.dto';
+import {
+    driverStatisticsQuerySchema,
+    driverViolationsQuerySchema,
+    getMyTripsQuerySchema,
+} from './driver-portal.dto';
+import { defaultEvaluationMonth, getDriverMonthlyStatistics } from './driver-statistics.service';
 import type { SaveFaceTemplateBody, TripCheckinBody } from './driver-portal.dto';
 
 const getDriverUserIdFromJwt = (req: Request) => {
@@ -23,11 +28,44 @@ const parseMyTripsQuery = (req: Request) => {
     return parsed.query;
 };
 
+const parseMyViolationsQuery = (req: Request) => {
+    const parsed = driverViolationsQuerySchema.parse({
+        query: req.query,
+        body: req.body,
+        params: req.params,
+    });
+    return parsed.query;
+};
+
+const parseDriverStatisticsQuery = (req: Request) => {
+    const parsed = driverStatisticsQuerySchema.parse({
+        query: req.query,
+        body: req.body,
+        params: req.params,
+    });
+    return parsed.query;
+};
+
 export const getMyTrips = catchAsync(async (req: Request, res: Response) => {
     const driverUserId = getDriverUserIdFromJwt(req);
     const q = parseMyTripsQuery(req);
     const result = await driverPortalService.getMyTrips(driverUserId, q);
     res.status(200).json(ServiceResponse.success('Lấy lịch trình chuyến đi của bạn thành công', result));
+});
+
+export const getMyViolations = catchAsync(async (req: Request, res: Response) => {
+    const driverUserId = getDriverUserIdFromJwt(req);
+    const q = parseMyViolationsQuery(req);
+    const result = await driverPortalService.getMyViolations(driverUserId, q);
+    res.status(200).json(ServiceResponse.success('Lấy lịch sử vi phạm của bạn thành công.', result));
+});
+
+export const getDriverStatistics = catchAsync(async (req: Request, res: Response) => {
+    const driverUserId = getDriverUserIdFromJwt(req);
+    const q = parseDriverStatisticsQuery(req);
+    const evaluationMonth = q.month ?? defaultEvaluationMonth();
+    const result = await getDriverMonthlyStatistics(driverUserId, evaluationMonth);
+    res.status(200).json(ServiceResponse.success('Thống kê điểm an toàn & thu nhập dự kiến.', result));
 });
 
 export const saveFaceTemplate = catchAsync(async (req: Request, res: Response) => {

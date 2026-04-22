@@ -1,10 +1,17 @@
 import { AppDataSource } from '../../config/data-source';
 import { Trip } from '../../entities/trip.entity';
+import { AiViolation } from '../../entities/ai-violation.entity';
 import { DriverProfile } from '../../entities/driver-profile.entity';
 import { TripCheckin } from '../../entities/trip-checkin.entity';
 import { CheckinResult, TripStatus } from '../../common/constants/enums';
+import { vnMonthRangeFromYearMonth } from '../../common/utils/vn-timezone';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
-import type { GetMyTripsQuery, SaveFaceTemplateBody, TripCheckinBody } from './driver-portal.dto';
+import type {
+    DriverViolationsQuery,
+    GetMyTripsQuery,
+    SaveFaceTemplateBody,
+    TripCheckinBody,
+} from './driver-portal.dto';
 
 const FACE_ENCODING_DIM = 128;
 
@@ -109,6 +116,72 @@ const getMyTripsImpl = async (driverUserId: string, query: GetMyTripsQuery) => {
             currentPage: page,
             totalPages: Math.ceil(total / limit) || 1,
             limit,
+        },
+    };
+};
+
+export type DriverViolationListItem = {
+    id: string;
+    type: string;
+    occurred_at: string;
+    image_url: string;
+    trip_code: string;
+    trip_id: string;
+    coordinates: {
+        latitude: number | null;
+        longitude: number | null;
+    };
+};
+
+/**
+ * US_16 — Vi phạm của chính tài xế (`driver_id` = JWT), trong tháng VN, có phân trang.
+ */
+const getMyViolationsImpl = async (driverUserId: string, query: DriverViolationsQuery) => {
+    const { month, tripCode, page, limit } = query;
+    const { from, to } = vnMonthRangeFromYearMonth(month);
+    const skip = (page - 1) * limit;
+
+    const vioRepo = AppDataSource.getRepository(AiViolation);
+    const qb = vioRepo
+        .createQueryBuilder('v')
+        .innerJoinAndSelect('v.trip', 't')
+        .where('v.driver_id = :driverUserId', { driverUserId })
+        .andWhere('t.driver_id = :driverUserId', { driverUserId })
+        .andWhere('v.occurred_at >= :from AND v.occurred_at <= :to', { from, to });
+
+    if (tripCode) {
+        qb.andWhere('t.trip_code = :tripCode', { tripCode });
+    }
+
+    const countQb = qb.clone();
+    const total = await countQb.getCount();
+
+    const rows = await qb
+        .orderBy('v.occurred_at', 'DESC')
+        .skip(skip)
+        .take(limit)
+        .getMany();
+
+    const data: DriverViolationListItem[] = rows.map((v) => ({
+        id: v.id,
+        type: v.type,
+        occurred_at: v.occurred_at.toISOString(),
+        image_url: v.image_url,
+        trip_code: v.trip.trip_code,
+        trip_id: v.trip_id,
+        coordinates: {
+            latitude: v.latitude ?? null,
+            longitude: v.longitude ?? null,
+        },
+    }));
+
+    return {
+        data,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: total > 0 ? Math.ceil(total / limit) : 0,
         },
     };
 };
@@ -272,12 +345,14 @@ const checkinTripImpl = async (
 
 export const DriverPortalService = {
     getMyTrips: getMyTripsImpl,
+    getMyViolations: getMyViolationsImpl,
     saveFaceTemplate: saveFaceTemplateImpl,
     getFaceTemplate: getFaceTemplateImpl,
     checkinTrip: checkinTripImpl,
 };
 
 export const getMyTrips = DriverPortalService.getMyTrips;
+export const getMyViolations = DriverPortalService.getMyViolations;
 export const saveFaceTemplate = DriverPortalService.saveFaceTemplate;
 export const getFaceTemplate = DriverPortalService.getFaceTemplate;
 export const checkinTrip = DriverPortalService.checkinTrip;

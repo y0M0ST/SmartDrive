@@ -4,6 +4,7 @@ import { seedRolePermissions } from './role-permission.seeder';
 import { seedRoles } from './role.seeder';
 import { seedUsers } from './user.seeder';
 import { seedViolationConfigs } from './violation-config.seeder';
+import { seedSalaryConfigs } from './salary-config.seeder';
 
 export async function runAllSeeders(): Promise<void> {
     await seedRoles();
@@ -12,4 +13,5 @@ export async function runAllSeeders(): Promise<void> {
     await seedAgencies();
     await seedUsers();
     await seedViolationConfigs();
+    await seedSalaryConfigs();
 }

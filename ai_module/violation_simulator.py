@@ -1,11 +1,15 @@
 """
-US_10 — Gửi một vi phạm AI giả lập (JSON) tới `POST /api/device/violation`.
+US_10 / US_16 — Gửi một vi phạm AI giả lập (JSON) tới `POST /api/device/violation`.
 
-Chạy: `python violation_simulator.py` (thư mục `ai_module`, `.env` có CURRENT_TRIP_ID + MASTER_DEVICE_API_KEY).
+Chạy (thư mục `ai_module`, `.env` có MASTER_DEVICE_API_KEY):
+
+- Dùng `CURRENT_TRIP_ID` trong `.env`: `python violation_simulator.py`
+- Ghi đè chuyến cụ thể (ví dụ để test lịch sử tài xế US_16): `python violation_simulator.py <trip_uuid>`
 """
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import sys
@@ -30,9 +34,20 @@ _MOCK_PNG_BASE64 = (
 
 
 def main() -> int:
-    trip_id = (os.getenv("CURRENT_TRIP_ID") or "").strip()
+    parser = argparse.ArgumentParser(
+        description="Gửi 1 bản ghi vi phạm demo (JSON) — trip_id từ tham số hoặc CURRENT_TRIP_ID trong .env.",
+    )
+    parser.add_argument(
+        "trip_id",
+        nargs="?",
+        default=None,
+        help="UUID chuyến (ghi đè CURRENT_TRIP_ID). Ví dụ: python violation_simulator.py a1b2c3d4-....",
+    )
+    args = parser.parse_args()
+
+    trip_id = (args.trip_id or os.getenv("CURRENT_TRIP_ID") or "").strip()
     if not trip_id:
-        logger.error("Thiếu CURRENT_TRIP_ID trong .env.")
+        logger.error("Thiếu trip_id: truyền `python violation_simulator.py <trip_uuid>` hoặc đặt CURRENT_TRIP_ID trong .env.")
         return 1
 
     device_event_id = uuid.uuid4().hex
