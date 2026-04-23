@@ -68,6 +68,8 @@ router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN', 'COORDINA
  *         description: Chưa đăng nhập hoặc token không hợp lệ
  *       403:
  *         description: Không có quyền truy cập
+ *       500:
+ *         description: Lỗi máy chủ
  *   post:
  *     summary: Tạo phương tiện mới
  *     tags: [Vehicles]
@@ -110,6 +112,8 @@ router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN', 'COORDINA
  *         description: Không có quyền truy cập
  *       409:
  *         description: Trùng biển số hoặc trùng mã camera
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/', validate(getVehicleQuerySchema), vehicleController.getVehicles);
 router.post('/', validate(createVehicleSchema), vehicleController.createVehicle);
@@ -163,6 +167,8 @@ router.post('/', validate(createVehicleSchema), vehicleController.createVehicle)
  *         description: Không tìm thấy phương tiện
  *       409:
  *         description: Trùng biển số hoặc mã camera
+ *       500:
+ *         description: Lỗi máy chủ
  *   delete:
  *     summary: Xóa mềm phương tiện
  *     tags: [Vehicles]
@@ -187,6 +193,8 @@ router.post('/', validate(createVehicleSchema), vehicleController.createVehicle)
  *         description: Không có quyền truy cập
  *       404:
  *         description: Không tìm thấy phương tiện
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.put('/:id', validate(vehicleIdParamSchema.merge(updateVehicleSchema)), vehicleController.updateVehicle);
 router.delete('/:id', validate(vehicleIdParamSchema), vehicleController.deleteVehicle);
@@ -231,6 +239,8 @@ router.delete('/:id', validate(vehicleIdParamSchema), vehicleController.deleteVe
  *         description: Không có quyền truy cập
  *       404:
  *         description: Không tìm thấy phương tiện
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.patch('/:id/status', validate(vehicleIdParamSchema.merge(changeVehicleStatusSchema)), vehicleController.changeStatus);
 

@@ -76,6 +76,8 @@ router.use(authMiddleware, requireAgencyAdminOrDispatcher);
  *         description: Chưa đăng nhập
  *       403:
  *         description: Super Admin hoặc không đủ quyền / thiếu agency_id
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/dashboard', validate(agencyReportQuerySchema), reportsController.getDashboard);
 
@@ -120,12 +122,16 @@ router.get('/dashboard', validate(agencyReportQuerySchema), reportsController.ge
  *             schema:
  *               type: string
  *               format: binary
- *       404:
- *         description: Không có chuyến hoàn thành và không có vi phạm trong khoảng thời gian
  *       400:
  *         description: Dữ liệu query không hợp lệ
+ *       401:
+ *         description: Chưa đăng nhập
  *       403:
  *         description: Super Admin hoặc không đủ quyền
+ *       404:
+ *         description: Không có chuyến hoàn thành và không có vi phạm trong khoảng thời gian
+ *       500:
+ *         description: Lỗi máy chủ hoặc lỗi tạo file
  */
 router.get('/export-excel', validate(agencyReportQuerySchema), reportsController.exportExcel);
 

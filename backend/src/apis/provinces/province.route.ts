@@ -95,6 +95,8 @@ const router = Router();
  *                       name: Da Nang
  *       400:
  *         description: Query khong hop le
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/', validate(getProvincesQuerySchema), getProvincesHandler);
 
