@@ -53,6 +53,8 @@ router.use(authMiddleware, requireRole(['DRIVER']));
  *         description: Chưa đăng nhập
  *       403:
  *         description: Không phải tài xế (DRIVER)
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/me/trips', validate(getMyTripsQuerySchema), driverPortalController.getMyTrips);
 
@@ -105,6 +107,8 @@ router.get('/me/trips', validate(getMyTripsQuerySchema), driverPortalController.
  *         description: Chưa đăng nhập
  *       403:
  *         description: Không phải DRIVER
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/violations', validate(driverViolationsQuerySchema), driverPortalController.getMyViolations);
 
@@ -226,6 +230,8 @@ router.get('/violations', validate(driverViolationsQuerySchema), driverPortalCon
  *         description: Chưa đăng nhập
  *       403:
  *         description: Không phải DRIVER
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/statistics', validate(driverStatisticsQuerySchema), driverPortalController.getDriverStatistics);
 
@@ -260,6 +266,10 @@ router.get('/statistics', validate(driverStatisticsQuerySchema), driverPortalCon
  *         description: Không phải DRIVER
  *       404:
  *         description: Không có hồ sơ tài xế
+ *       400:
+ *         description: `faceEncoding` không đúng 128 phần tử hoặc không phải số
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.post(
     '/me/face-template',
@@ -280,6 +290,12 @@ router.post(
  *         description: Trả về faceEncoding (mảng 128 số)
  *       404:
  *         description: Chưa đăng ký mẫu khuôn mặt
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải DRIVER
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/me/face-template', driverPortalController.getFaceTemplate);
 
@@ -316,6 +332,14 @@ router.get('/me/face-template', driverPortalController.getFaceTemplate);
  *         description: SUCCESS — chuyến chuyển sang IN_PROGRESS
  *       400:
  *         description: FAILED / LOCKED hoặc chuyến không ở trạng thái SCHEDULED
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải DRIVER hoặc chuyến không thuộc tài xế
+ *       404:
+ *         description: Không tìm thấy chuyến
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.post(
     '/me/trips/:tripId/checkin',

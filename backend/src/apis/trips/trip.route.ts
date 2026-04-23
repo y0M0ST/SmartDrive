@@ -28,29 +28,42 @@ router.use(authMiddleware, requireRole(['AGENCY_ADMIN']));
  *     tags: [Trips]
  *     security:
  *       - bearerAuth: []
+ *     description: |
+ *       Query khớp `getTripQuerySchema`: `page` / `limit` là chuỗi số (mặc định "1" / "10"); `status` lọc theo enum chuyến.
+ *       Chỉ **AGENCY_ADMIN**; `agency_id` lấy từ JWT.
  *     parameters:
  *       - in: query
  *         name: page
+ *         required: false
  *         schema:
- *           type: integer
- *           default: 1
+ *           type: string
+ *           default: "1"
+ *         description: Số trang
  *       - in: query
  *         name: limit
+ *         required: false
  *         schema:
- *           type: integer
- *           default: 10
+ *           type: string
+ *           default: "10"
+ *         description: Kích thước trang
  *       - in: query
  *         name: status
+ *         required: false
  *         schema:
  *           type: string
  *           enum: [SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED]
+ *         description: Lọc theo trạng thái chuyến
  *     responses:
  *       200:
  *         description: Thành công
+ *       400:
+ *         description: Query không hợp lệ
  *       401:
  *         description: Chưa đăng nhập
  *       403:
  *         description: Không đủ quyền
+ *       500:
+ *         description: Lỗi máy chủ
  */
 
 /**
@@ -78,7 +91,13 @@ router.use(authMiddleware, requireRole(['AGENCY_ADMIN']));
  *       200:
  *         description: Danh sách tài xế khả dụng
  *       400:
- *         description: Query không hợp lệ
+ *         description: Query không hợp lệ (thiếu tham số, datetime sai, `planned_end_time` ≤ `departure_time`)
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không đủ quyền
+ *       500:
+ *         description: Lỗi máy chủ
  */
 
 /**
@@ -106,7 +125,13 @@ router.use(authMiddleware, requireRole(['AGENCY_ADMIN']));
  *       200:
  *         description: Danh sách xe khả dụng
  *       400:
- *         description: Query không hợp lệ
+ *         description: Query không hợp lệ (thiếu tham số, datetime sai, `planned_end_time` ≤ `departure_time`)
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không đủ quyền
+ *       500:
+ *         description: Lỗi máy chủ
  */
 
 /**
@@ -138,6 +163,8 @@ router.use(authMiddleware, requireRole(['AGENCY_ADMIN']));
  *         description: Chuyến không thuộc nhà xe của bạn
  *       404:
  *         description: Không tìm thấy chuyến
+ *       500:
+ *         description: Lỗi máy chủ
  */
 
 /**
@@ -189,6 +216,8 @@ router.use(authMiddleware, requireRole(['AGENCY_ADMIN']));
  *         description: Không tìm thấy tuyến/xe/tài xế hoặc không thuộc nhà xe
  *       409:
  *         description: Trùng lịch tài xế hoặc xe
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get(
     '/available-drivers',
