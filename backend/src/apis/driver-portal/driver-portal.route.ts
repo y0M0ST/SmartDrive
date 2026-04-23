@@ -267,7 +267,7 @@ router.get('/statistics', validate(driverStatisticsQuerySchema), driverPortalCon
  *       404:
  *         description: Không có hồ sơ tài xế
  *       400:
- *         description: `faceEncoding` không đúng 128 phần tử hoặc không phải số
+ *         description: Mảng faceEncoding không đúng 128 phần tử
  *       500:
  *         description: Lỗi máy chủ
  */
