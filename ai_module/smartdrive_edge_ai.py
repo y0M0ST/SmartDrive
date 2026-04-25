@@ -1,11 +1,12 @@
 """
-US_19 / US_21 — Edge AI: EAR + Head pose, cảnh báo âm thanh (thread riêng),
+US_19 / US_21 — Edge AI: EAR + Head pose, cảnh báo âm thanh WAV (pygame, thread riêng),
 đồng bộ Backend qua SQLite + cache đĩa (`persistence_manager`) — không block camera.
 
 Chạy thử (webcam laptop, backend đang mở):
   cd ai_module
   copy .env.example .env   # điền MASTER_DEVICE_API_KEY, CURRENT_TRIP_ID, SMARTDRIVE_DEVICE_VIOLATION_JSON_URL
-  pip install -r requirements.txt
+  pip install -r requirements.txt   # gồm pygame — phát alarm_drowsy.wav / alarm_distracted.wav nếu có
+  # Đặt hai file WAV cạnh smartdrive_edge_ai.py (hoặc chỉnh EDGE_ALARM_*_WAV trong .env)
   python smartdrive_edge_ai.py
 
 Test mất mạng (US_21): tắt Node, gây vi phạm → kiểm tra `database/violation_queue.db` và `cache/*.jpg`;
@@ -34,11 +35,6 @@ import numpy as np
 import requests
 
 try:
-    import sounddevice as sd
-except ImportError:
-    sd = None  # type: ignore[assignment]
-
-try:
     import mediapipe as mp
 except ImportError as e:  # pragma: no cover
     raise SystemExit("Cần cài mediapipe: pip install -r requirements.txt") from e
@@ -52,7 +48,10 @@ load_dotenv(_ENV_PATH)
 MASTER_DEVICE_API_KEY = (os.getenv("MASTER_DEVICE_API_KEY") or "").strip()
 
 from api_client import send_violation_json  # noqa: E402
+from audio_alarm_manager import AudioAlarmManager  # noqa: E402
 from persistence_manager import PersistenceManager, image_path_to_base64  # noqa: E402
+
+_MODULE_DIR = Path(__file__).resolve().parent
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("smartdrive_edge_ai")
@@ -127,49 +126,6 @@ def estimate_head_pose_degrees(
     if not ok:
         return None
     return rotation_vector_to_euler_degrees(rvec, tvec)
-
-
-class ViolationAlarmState:
-    """Đọc/ghi từ main thread; audio thread chỉ đọc (atomic ref string + lock nhẹ)."""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._kind: Optional[str] = None  # "DROWSY" | "DISTRACTED" | None
-
-    def set(self, kind: Optional[str]) -> None:
-        with self._lock:
-            self._kind = kind
-
-    def get(self) -> Optional[str]:
-        with self._lock:
-            return self._kind
-
-
-def audio_worker_loop(stop: threading.Event, alarm: ViolationAlarmState, sample_rate: int) -> None:
-    """Phát beep lặp khi có vi phạm; KHÔNG chạy trên main thread."""
-    if sd is None:
-        logger.warning("Không có sounddevice — bỏ qua cảnh báo âm thanh (pip install sounddevice).")
-        while not stop.is_set():
-            stop.wait(0.5)
-        return
-
-    duration = 0.12
-    t = np.linspace(0.0, duration, int(sample_rate * duration), endpoint=False, dtype=np.float32)
-    beep_hi = (0.25 * np.sin(2 * np.pi * 880.0 * t)).astype(np.float32)
-    beep_lo = (0.25 * np.sin(2 * np.pi * 520.0 * t)).astype(np.float32)
-
-    while not stop.is_set():
-        kind = alarm.get()
-        if kind:
-            buf = beep_hi if kind == "DISTRACTED" else beep_lo
-            try:
-                sd.play(buf, sample_rate, blocking=True)
-            except Exception as e:  # noqa: BLE001
-                logger.warning("Audio play: %s", e)
-            # Nghỉ rất ngắn — chỉ trong audio thread
-            stop.wait(0.08)
-        else:
-            stop.wait(0.05)
 
 
 def _probe_network(json_url: str) -> bool:
@@ -262,22 +218,21 @@ def main() -> int:
     lng = float(os.getenv("EDGE_DEFAULT_LNG", "108.25")) if os.getenv("EDGE_DEFAULT_LNG") else None
 
     stop_ev = threading.Event()
-    alarm_state = ViolationAlarmState()
+    audio_alarm = AudioAlarmManager(
+        _MODULE_DIR,
+        stop_ev,
+        drowsy_wav=(os.getenv("EDGE_ALARM_DROWSY_WAV") or "alarm_drowsy.wav").strip(),
+        distracted_wav=(os.getenv("EDGE_ALARM_DISTRACTED_WAV") or "alarm_distracted.wav").strip(),
+    )
+    audio_alarm.start()
     pm = PersistenceManager()
 
-    audio_t = threading.Thread(
-        target=audio_worker_loop,
-        args=(stop_ev, alarm_state, int(os.getenv("EDGE_AUDIO_SAMPLE_RATE", "44100"))),
-        name="AudioWorker",
-        daemon=True,
-    )
     sync_t = threading.Thread(
         target=sync_worker_loop,
         args=(stop_ev, pm, sync_interval, sync_batch, health_url, MASTER_DEVICE_API_KEY),
         name="SyncWorker",
         daemon=True,
     )
-    audio_t.start()
     sync_t.start()
 
     mp_face_mesh = mp.solutions.face_mesh
@@ -361,7 +316,7 @@ def main() -> int:
                 p_bad_since = None
                 drowsy_active = False
                 pose_active = False
-                alarm_state.set(None)
+                audio_alarm.set_alarm(None)
                 cv2.putText(frame, "NO FACE", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 2)
                 cv2.imshow("SmartDrive Edge AI (US_19) — q: thoát", frame)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -391,13 +346,13 @@ def main() -> int:
             if not pose_active:
                 sent_pose = False
 
-            # Âm thanh: DISTRACTED ưu tiên
+            # Âm thanh (US_19): DISTRACTED ưu tiên — pygame thread; về OK → set None tắt ngay
             if pose_active:
-                alarm_state.set("DISTRACTED")
+                audio_alarm.set_alarm("DISTRACTED")
             elif drowsy_active:
-                alarm_state.set("DROWSY")
+                audio_alarm.set_alarm("DROWSY")
             else:
-                alarm_state.set(None)
+                audio_alarm.set_alarm(None)
 
             # US_21 — Ghi SQLite + ảnh disk (rising edge + latch)
             occurred_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -466,7 +421,7 @@ def main() -> int:
         cap.release()
         face_mesh.close()
         cv2.destroyAllWindows()
-        audio_t.join(timeout=2.0)
+        audio_alarm.join(timeout=2.5)
         sync_t.join(timeout=3.0)
 
     logger.info("Đã thoát Edge AI.")
