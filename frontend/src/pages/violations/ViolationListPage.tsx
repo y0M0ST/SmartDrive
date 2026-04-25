@@ -2,10 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ViolationFiltersBar } from "@/components/violations/ViolationFiltersBar";
+import {
+  ViolationFiltersBar,
+  type ReadFilterValue,
+} from "@/components/violations/ViolationFiltersBar";
 import { ViolationDataTable } from "@/components/violations/ViolationDataTable";
 import { ViolationDetailModal } from "@/components/violations/ViolationDetailModal";
 import { violationApi, unwrapViolationList } from "@/services/violationApi";
+import { violationsInboxApi } from "@/services/violationsInboxApi";
 import { provinceApi, type VietnamProvinceDto } from "@/services/provinceApi";
 import { adminApi } from "@/services/adminApi";
 import api from "@/services/api";
@@ -43,6 +47,7 @@ export default function ViolationListPage() {
   const [driverId, setDriverId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [violationType, setViolationType] = useState("");
+  const [readFilter, setReadFilter] = useState<ReadFilterValue>("all");
 
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<AgencyViolationListItem[]>([]);
@@ -75,8 +80,9 @@ export default function ViolationListPage() {
     [provinceByCode],
   );
 
-  const fetchViolations = useCallback(async () => {
-    setLoading(true);
+  const fetchViolations = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) setLoading(true);
     try {
       const res = await violationApi.getList({
         page,
@@ -86,6 +92,7 @@ export default function ViolationListPage() {
         ...(driverId ? { driverId } : {}),
         ...(vehicleId ? { vehicleId } : {}),
         ...(violationType ? { type: violationType as "DROWSY" | "DISTRACTED" } : {}),
+        ...(readFilter === "read" ? { isRead: true } : readFilter === "unread" ? { isRead: false } : {}),
       });
       const parsed = unwrapViolationList(res);
       if (!parsed) {
@@ -101,13 +108,15 @@ export default function ViolationListPage() {
         limit: parsed.meta.limit,
       });
     } catch {
-      toast.error("Không tải được lịch sử vi phạm.");
-      setRows([]);
-      setMeta({ total: 0, currentPage: 1, totalPages: 1, limit: PAGE_SIZE });
+      if (!silent) {
+        toast.error("Không tải được lịch sử vi phạm.");
+        setRows([]);
+        setMeta({ total: 0, currentPage: 1, totalPages: 1, limit: PAGE_SIZE });
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [page, dateFrom, dateTo, driverId, vehicleId, violationType]);
+  }, [page, dateFrom, dateTo, driverId, vehicleId, violationType, readFilter]);
 
   useEffect(() => {
     void fetchViolations();
@@ -196,6 +205,11 @@ export default function ViolationListPage() {
     setViolationType(t);
   }, []);
 
+  const onReadFilterChange = useCallback((v: ReadFilterValue) => {
+    setPage(1);
+    setReadFilter(v);
+  }, []);
+
   const onReset = useCallback(() => {
     const y = vnTodayYmd();
     setPage(1);
@@ -204,12 +218,27 @@ export default function ViolationListPage() {
     setDriverId("");
     setVehicleId("");
     setViolationType("");
+    setReadFilter("all");
   }, []);
 
-  const openDetail = useCallback((row: AgencyViolationListItem) => {
-    setDetailItem(row);
-    setDetailOpen(true);
-  }, []);
+  const openDetail = useCallback(
+    (row: AgencyViolationListItem) => {
+      setDetailItem(row);
+      setDetailOpen(true);
+      if (row.is_read) return;
+      void (async () => {
+        try {
+          await violationsInboxApi.acknowledge(row.id);
+          setDetailItem((prev) => (prev?.id === row.id ? { ...prev, is_read: true } : prev));
+          setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, is_read: true } : r)));
+          void fetchViolations({ silent: true });
+        } catch {
+          toast.error("Không đánh dấu đã đọc được. Bằng chứng vẫn hiển thị.");
+        }
+      })();
+    },
+    [fetchViolations],
+  );
 
   const onDetailOpenChange = useCallback((open: boolean) => {
     setDetailOpen(open);
@@ -223,7 +252,8 @@ export default function ViolationListPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Lịch sử vi phạm AI</h1>
             <p className="text-sm text-muted-foreground">
-              Theo dõi bằng chứng hình ảnh, tuyến và tài xế — lọc theo ngày, xe và loại vi phạm.
+              Theo dõi bằng chứng hình ảnh, tuyến, mã chuyến và tài xế — lọc theo ngày, xe, loại vi phạm và trạng
+              thái đã đọc.
             </p>
           </div>
 
@@ -241,6 +271,8 @@ export default function ViolationListPage() {
             vehiclesLoading={vehiclesLoading}
             violationType={violationType}
             onViolationTypeChange={onViolationTypeChange}
+            readFilter={readFilter}
+            onReadFilterChange={onReadFilterChange}
             onReset={onReset}
           />
 

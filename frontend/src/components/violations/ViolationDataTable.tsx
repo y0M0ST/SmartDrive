@@ -57,6 +57,7 @@ export function ViolationDataTable({
             <TableHead>Tài xế</TableHead>
             <TableHead className="w-[110px]">Biển số</TableHead>
             <TableHead>Tuyến đường</TableHead>
+            <TableHead className="w-[120px]">Mã chuyến</TableHead>
             <TableHead className="w-[150px]">Loại vi phạm</TableHead>
             <TableHead className="w-[100px] text-center">Bằng chứng</TableHead>
           </TableRow>
@@ -64,13 +65,13 @@ export function ViolationDataTable({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                 <Loader2 className="mx-auto h-8 w-8 animate-spin opacity-70" aria-hidden />
               </TableCell>
             </TableRow>
           ) : rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                 Không có bản ghi vi phạm trong khoảng đã chọn.
               </TableCell>
             </TableRow>
@@ -94,6 +95,9 @@ export function ViolationDataTable({
                     {row.trip?.route?.name ? (
                       <div className="line-clamp-1 text-xs text-muted-foreground">{row.trip.route.name}</div>
                     ) : null}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm font-semibold">
+                    {row.trip?.trip_code?.trim() ? row.trip.trip_code : "—"}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={violationTypeBadgeClass(row.type, isDark)}>
