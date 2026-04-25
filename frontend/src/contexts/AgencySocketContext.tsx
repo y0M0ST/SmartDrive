@@ -16,6 +16,8 @@ import { playViolationAlertSound } from "@/lib/violationAlertSound";
 import { violationsInboxApi, unwrapViolationsUnread } from "@/services/violationsInboxApi";
 import type { AiViolationAlertPayload, ViolationUnreadItem } from "@/types/violationsInbox";
 import { ViolationSocketToastCard } from "@/components/agency/ViolationSocketToastCard";
+import { isTripGpsSocketPayload } from "@/types/tripTracking";
+import { ingestTripGpsUpdate } from "@/lib/tripGpsLiveStore";
 
 function isAiViolationAlertPayload(raw: unknown): raw is AiViolationAlertPayload {
   if (!raw || typeof raw !== "object") return false;
@@ -144,10 +146,17 @@ export function AgencySocketProvider({ children }: { children: ReactNode }) {
       );
     };
 
+    const onTripGps = (raw: unknown) => {
+      if (!isTripGpsSocketPayload(raw)) return;
+      ingestTripGpsUpdate(raw);
+    };
+
     socket.on("ai_violation_alert", onAlert);
+    socket.on("trip_gps_update", onTripGps);
 
     return () => {
       socket.off("ai_violation_alert", onAlert);
+      socket.off("trip_gps_update", onTripGps);
       socket.disconnect();
       if (socketRef.current === socket) {
         socketRef.current = null;

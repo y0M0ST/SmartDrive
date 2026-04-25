@@ -252,10 +252,6 @@ def send_violation_json(
     }
 
     try:
-        print("--- DEBUG THẺ TỪ ---")
-        print(f"Key thực tế chuẩn bị gửi: [{key}]")
-        print(f"Headers gửi đi: {headers}")
-        print("--------------------")
         resp = requests.post(
             VIOLATION_JSON_URL,
             json=payload,

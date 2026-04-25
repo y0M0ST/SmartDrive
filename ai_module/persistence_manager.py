@@ -4,6 +4,7 @@ US_21 — Hàng đợi vi phạm bền vững (SQLite + ảnh trên đĩa), đ�
 - `enqueue_violation`: ghi DB + lưu JPEG vào `cache/`.
 - `get_next_batch`: FIFO theo `id`.
 - `mark_as_sent`: xóa hàng + xóa file ảnh (ACK HTTP 2xx từ `api_client.send_violation_json`).
+- `prune_cache_orphans` + `_enforce_storage_limits_post_prune`: xóa mồ côi; tùy chọn cap số pending / evict FIFO khi cache vượt ngưỡng (xem `.env`).
 """
 
 from __future__ import annotations
@@ -66,6 +67,8 @@ class PersistenceManager:
         self._cache_dir = Path(cache_dir or os.getenv("PERSISTENCE_CACHE_DIR", str(_DEFAULT_CACHE)))
         self._max_cache_bytes = int(os.getenv("PERSISTENCE_MAX_CACHE_BYTES", str(max_cache_bytes)))
         self._max_pending_warn = int(os.getenv("PERSISTENCE_MAX_PENDING_WARN", str(max_pending_warn)))
+        # 0 = tắt cap (mặc định). Đặt >0 để giới hạn số bản ghi chưa sync (FIFO evict cũ nhất).
+        self._max_pending_records = int(os.getenv("PERSISTENCE_MAX_PENDING_RECORDS", "0"))
         self._lock = threading.RLock()
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -197,6 +200,27 @@ class PersistenceManager:
             finally:
                 conn.close()
 
+    def evict_oldest_pending(self, *, reason: str) -> bool:
+        """
+        Xóa **một** bản ghi pending cũ nhất (FIFO theo `id`) + ảnh — dùng khi vượt cap hoặc vượt dung lượng cache.
+        Cảnh báo: mất bằng chứng cục bộ chưa gửi được server (chỉ khi cấu hình bật / áp lực đĩa).
+        """
+        with self._lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute(
+                    "SELECT device_event_id FROM violation_queue ORDER BY id ASC LIMIT 1;",
+                )
+                row = cur.fetchone()
+            finally:
+                conn.close()
+        if not row:
+            return False
+        eid = str(row["device_event_id"])
+        logger.warning("[US_21] Evict oldest pending (%s): %s…", reason, eid[:16])
+        self.mark_as_sent(eid)
+        return True
+
     def mark_as_sent(self, device_event_id: str) -> None:
         """Sau ACK 2xx: xóa DB + xóa file ảnh."""
         with self._lock:
@@ -296,7 +320,34 @@ class PersistenceManager:
         total = self._cache_dir_total_bytes()
         if total > self._max_cache_bytes:
             logger.warning(
-                "[US_21] Dung lượng cache (~%s MB) vẫn vượt %s MB — còn toàn file đang chờ sync, KHÔNG xóa thêm.",
+                "[US_21] Dung lượng cache (~%s MB) vẫn vượt %s MB sau orphan prune — thử evict pending FIFO.",
+                round(total / (1024 * 1024), 1),
+                round(self._max_cache_bytes / (1024 * 1024), 1),
+            )
+        self._enforce_storage_limits_post_prune()
+
+    def _enforce_storage_limits_post_prune(self) -> None:
+        """Cap số pending (tuỳ cấu hình); nếu cache vẫn > ngưỡng thì evict FIFO cho tới khi đủ chỗ hoặc hết hàng."""
+        cap = self._max_pending_records
+        if cap > 0:
+            while self.pending_count() > cap:
+                if not self.evict_oldest_pending(reason=f"PERSISTENCE_MAX_PENDING_RECORDS={cap}"):
+                    break
+
+        max_evictions = 50_000
+        n = 0
+        while self._cache_dir_total_bytes() > self._max_cache_bytes and n < max_evictions:
+            n += 1
+            if not self.evict_oldest_pending(reason="PERSISTENCE_MAX_CACHE_BYTES"):
+                logger.warning(
+                    "[US_21] Cache vượt ngưỡng nhưng không còn pending để evict — cần tăng ổ hoặc giảm vi phạm offline.",
+                )
+                break
+
+        total = self._cache_dir_total_bytes()
+        if total > self._max_cache_bytes:
+            logger.warning(
+                "[US_21] Sau evict, cache ~%s MB vẫn > %s MB.",
                 round(total / (1024 * 1024), 1),
                 round(self._max_cache_bytes / (1024 * 1024), 1),
             )

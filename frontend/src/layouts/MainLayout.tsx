@@ -26,6 +26,7 @@ const AGENCY_MENU_ITEMS = [
   },
   { icon: Icons.Clipboard, label: "Quản lí tuyến đường", path: "/admin/routes" },
   { icon: Icons.Calendar, label: "Quản lí chuyến đi", path: "/admin/trips" },
+  { icon: Icons.MapPin, label: "Giám sát hành trình", path: "/admin/fleet" },
   { icon: Icons.Monitor, label: "Lịch sử vi phạm", path: "/admin/violations" },
   { icon: Icons.History, label: "Đánh giá và xếp hạng", path: "/admin/ratings" },
   { icon: Icons.MessageSquare, label: "Thống kê thu nhập & báo cáo", path: "/admin/finance" },
