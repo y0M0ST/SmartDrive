@@ -1,6 +1,7 @@
 import api from "./api";
 import type { DriverMyTripsPayload } from "@/types/driverPortal";
 import type { DriverViolationsPayload } from "@/types/driverViolations";
+import type { DriverStatisticsPayload } from "@/types/driverStatistics";
 
 export type MyTripsParams = {
   page?: number;
@@ -12,6 +13,11 @@ export type MyViolationsParams = {
   tripCode?: string;
   page?: number;
   limit?: number;
+};
+
+export type DriverStatisticsParams = {
+  /** `YYYY-MM` theo lịch VN; bỏ qua = BE dùng tháng hiện tại. */
+  month?: string;
 };
 
 /** Khớp `ServiceResponse` — payload `{ data, meta }` nằm trong `response.data.data`. */
@@ -48,6 +54,19 @@ export function unwrapDriverViolations(res: {
   return inner as DriverViolationsPayload;
 }
 
+/** US_17 — `{ cards, charts }` trong `response.data.data`. */
+export function unwrapDriverStatistics(res: {
+  data?: { data?: DriverStatisticsPayload };
+}): DriverStatisticsPayload | null {
+  const inner = res.data?.data;
+  if (!inner?.cards || !inner.charts) return null;
+  if (typeof inner.cards.evaluation_month !== "string") return null;
+  if (!Array.isArray(inner.charts.safety_score_by_week) || !Array.isArray(inner.charts.estimated_income_by_week)) {
+    return null;
+  }
+  return inner as DriverStatisticsPayload;
+}
+
 export const driverApi = {
   getUsers: (params?: Record<string, unknown>) => api.get("/users", { params }),
   createUser: (data: unknown) => api.post("/users", data),
@@ -61,6 +80,12 @@ export const driverApi = {
 
   /** US_15 — JWT DRIVER, không gửi driverId. */
   getMyTrips: (params?: MyTripsParams) => api.get("/driver/me/trips", { params }),
+
+  /** US_17 — Thống kê điểm an toàn & thu nhập dự kiến (`month` tuỳ chọn). */
+  getStatistics: (params?: DriverStatisticsParams) =>
+    api.get("/driver/statistics", {
+      params: params?.month?.trim() ? { month: params.month.trim() } : {},
+    }),
 
   /** US_16 — Lịch sử vi phạm (bắt buộc `month=YYYY-MM`). */
   getMyViolations: (params: MyViolationsParams) =>

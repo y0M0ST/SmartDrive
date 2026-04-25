@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { CalendarDays, ShieldAlert, Bell, UserRound, LogOut } from "lucide-react";
+import { CalendarDays, ShieldAlert, BarChart3, Bell, UserRound, LogOut } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import {
@@ -14,6 +14,7 @@ import { readStoredUserFullName } from "@/lib/adminAccess";
 const NAV = [
   { to: "/portal/driver/schedule", label: "Lịch chạy", icon: CalendarDays },
   { to: "/portal/driver/violations", label: "Vi phạm", icon: ShieldAlert },
+  { to: "/portal/driver/statistics", label: "Thống kê", icon: BarChart3 },
   { to: "/portal/driver/notifications", label: "Thông báo", icon: Bell },
   { to: "/portal/driver/me", label: "Cá nhân", icon: UserRound },
 ] as const;
