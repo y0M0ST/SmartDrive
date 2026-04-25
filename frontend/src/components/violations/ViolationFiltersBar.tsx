@@ -11,6 +11,9 @@ import { ViolationDateRangePicker } from "./ViolationDateRangePicker";
 
 const ALL = "__all__";
 
+/** Tất cả / đã đọc / chưa đọc — khớp query `isRead` của API (boolean hoặc bỏ qua). */
+export type ReadFilterValue = "all" | "read" | "unread";
+
 export type DriverOption = { id: string; full_name: string };
 export type VehicleOption = { id: string; license_plate: string };
 
@@ -28,6 +31,8 @@ type ViolationFiltersBarProps = {
   vehiclesLoading?: boolean;
   violationType: string;
   onViolationTypeChange: (type: string) => void;
+  readFilter: ReadFilterValue;
+  onReadFilterChange: (v: ReadFilterValue) => void;
   onReset: () => void;
 };
 
@@ -45,6 +50,8 @@ export function ViolationFiltersBar({
   vehiclesLoading,
   violationType,
   onViolationTypeChange,
+  readFilter,
+  onReadFilterChange,
   onReset,
 }: ViolationFiltersBarProps) {
   return (
@@ -115,6 +122,25 @@ export function ViolationFiltersBar({
               <SelectItem value={ALL}>Tất cả loại</SelectItem>
               <SelectItem value="DROWSY">Buồn ngủ (DROWSY)</SelectItem>
               <SelectItem value="DISTRACTED">Mất tập trung (DISTRACTED)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex min-w-[180px] flex-col gap-1.5">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Trạng thái đọc
+          </Label>
+          <Select
+            value={readFilter}
+            onValueChange={(v) => onReadFilterChange(v as ReadFilterValue)}
+          >
+            <SelectTrigger className="h-10 w-[200px] max-w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả</SelectItem>
+              <SelectItem value="read">Đã đọc</SelectItem>
+              <SelectItem value="unread">Chưa đọc</SelectItem>
             </SelectContent>
           </Select>
         </div>
