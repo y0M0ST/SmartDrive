@@ -35,6 +35,7 @@ import DriverSchedulePage from "./pages/portal/driver/DriverSchedulePage";
 import DriverNotificationsPage from "./pages/portal/driver/DriverNotificationsPage";
 import DriverMePage from "./pages/portal/driver/DriverMePage";
 import DriverViolationsPage from "./pages/portal/driver/DriverViolationsPage";
+import DriverStatisticsPage from "./pages/portal/driver/DriverStatisticsPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem("access_token");
@@ -216,6 +217,7 @@ function App() {
               <Route index element={<Navigate to="schedule" replace />} />
               <Route path="schedule" element={<DriverSchedulePage />} />
               <Route path="violations" element={<DriverViolationsPage />} />
+              <Route path="statistics" element={<DriverStatisticsPage />} />
               <Route path="notifications" element={<DriverNotificationsPage />} />
               <Route path="me" element={<DriverMePage />} />
             </Route>
