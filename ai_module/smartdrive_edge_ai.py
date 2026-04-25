@@ -48,6 +48,9 @@ from dotenv import load_dotenv
 _ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(_ENV_PATH)
 
+# Trùng backend `device-auth` — bắt buộc header `x-device-api-key` khi POST ingest.
+MASTER_DEVICE_API_KEY = (os.getenv("MASTER_DEVICE_API_KEY") or "").strip()
+
 from api_client import send_violation_json  # noqa: E402
 from persistence_manager import PersistenceManager, image_path_to_base64  # noqa: E402
 
@@ -190,6 +193,7 @@ def sync_worker_loop(
     interval_sec: float,
     batch_size: int,
     healthcheck_url: str,
+    device_api_key: str,
 ) -> None:
     """US_21 — định kỳ: có mạng → lấy batch SQLite → POST → mark_as_sent / increment_retry."""
     while not stop.is_set():
@@ -216,6 +220,7 @@ def sync_worker_loop(
                     lat=row.payload.get("latitude"),
                     lng=row.payload.get("longitude"),
                     occurred_at_iso=row.payload["occurred_at_iso"],
+                    device_api_key=device_api_key,
                 )
                 if ok:
                     pm.mark_as_sent(row.device_event_id)
@@ -248,6 +253,11 @@ def main() -> int:
     health_url = (os.getenv("SMARTDRIVE_DEVICE_VIOLATION_JSON_URL") or "").strip()
     if not health_url:
         health_url = "http://localhost:3000/api/device/violation"
+    if not MASTER_DEVICE_API_KEY:
+        logger.warning(
+            "Thiếu MASTER_DEVICE_API_KEY trong .env — POST ingest sẽ bị 401 từ backend. "
+            "Điền cùng giá trị với MASTER_DEVICE_API_KEY trên server.",
+        )
     lat = float(os.getenv("EDGE_DEFAULT_LAT", "16.04")) if os.getenv("EDGE_DEFAULT_LAT") else None
     lng = float(os.getenv("EDGE_DEFAULT_LNG", "108.25")) if os.getenv("EDGE_DEFAULT_LNG") else None
 
@@ -263,7 +273,7 @@ def main() -> int:
     )
     sync_t = threading.Thread(
         target=sync_worker_loop,
-        args=(stop_ev, pm, sync_interval, sync_batch, health_url),
+        args=(stop_ev, pm, sync_interval, sync_batch, health_url, MASTER_DEVICE_API_KEY),
         name="SyncWorker",
         daemon=True,
     )

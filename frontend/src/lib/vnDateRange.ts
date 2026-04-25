@@ -1,4 +1,4 @@
-import { subMonths } from "date-fns";
+import { endOfMonth, subMonths } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
 export const VN_IANA = "Asia/Ho_Chi_Minh";
@@ -14,6 +14,17 @@ export function vnTodayYmd(): string {
 /** Tháng hiện tại theo lịch VN (`YYYY-MM`) — khớp query `month` của US_16. */
 export function vnCurrentYearMonth(): string {
   return formatInTimeZone(new Date(), VN_IANA, "yyyy-MM");
+}
+
+/** Ngày đầu và cuối của tháng hiện tại theo lịch VN (`YYYY-MM-DD`). */
+export function vnCurrentFullMonthRangeYmd(): { from: string; to: string } {
+  const ym = vnCurrentYearMonth();
+  const [yStr, mStr] = ym.split("-");
+  const y = Number(yStr);
+  const m0 = Number(mStr) - 1;
+  const mid = new Date(Date.UTC(y, m0, 15, 12, 0, 0));
+  const to = formatInTimeZone(endOfMonth(mid), VN_IANA, "yyyy-MM-dd");
+  return { from: `${ym}-01`, to };
 }
 
 /** Danh sách `YYYY-MM` từ `monthsBack` tháng trước đến tháng hiện tại (VN), mới nhất trước. */

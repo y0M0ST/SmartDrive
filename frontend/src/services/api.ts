@@ -42,6 +42,7 @@ api.interceptors.response.use(
         console.error("Phiên đăng nhập hết hạn.");
         localStorage.removeItem("access_token");
         localStorage.removeItem("user_info"); // Xóa thêm thông tin user nếu có lưu
+        window.dispatchEvent(new Event("smartdrive:auth"));
         window.location.href = "/login";
       }
     }

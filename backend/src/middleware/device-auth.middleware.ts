@@ -17,6 +17,14 @@ export const deviceAuthMiddleware = (req: Request, res: Response, next: NextFunc
     const provided = Array.isArray(raw) ? raw[0] : raw;
 
     if (typeof provided !== 'string' || provided !== expected) {
+        console.log('--- BE DEBUG ---');
+        console.log('Header Client gửi lên:', req.headers['x-device-api-key']);
+        console.log('Key lưu trong BE .env:', process.env.MASTER_DEVICE_API_KEY);
+        console.log(
+            'Hai cái này có bằng nhau không?:',
+            req.headers['x-device-api-key'] === process.env.MASTER_DEVICE_API_KEY,
+        );
+        console.log('----------------');
         return next(new AppError('Khóa thiết bị không hợp lệ hoặc thiếu header x-device-api-key.', 401));
     }
 

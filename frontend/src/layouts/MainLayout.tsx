@@ -13,6 +13,8 @@ import {
   readStoredUserRole,
   readStoredUserFullName,
 } from "@/lib/adminAccess";
+import { AgencySocketProvider } from "@/contexts/AgencySocketContext";
+import { AgencyViolationBell } from "@/components/agency/AgencyViolationBell";
 
 /** Menu vận hành nhà xe — Super Admin không thấy các mục này. */
 const AGENCY_MENU_ITEMS = [
@@ -57,7 +59,8 @@ export default function MainLayout() {
   const isDark = (theme === "system" ? resolvedTheme : theme) === "dark";
 
   return (
-    // THẺ CHA: Ép màu nền tối nhất cho toàn trang
+    <AgencySocketProvider>
+    {/* THẺ CHA: Ép màu nền tối nhất cho toàn trang */}
     <div className="flex min-h-screen bg-background text-foreground antialiased transition-colors duration-300">
       
       {/* SIDEBAR: Đổi bg-white -> dark:bg-slate-900 */}
@@ -141,14 +144,7 @@ export default function MainLayout() {
                 className="cursor-pointer text-muted-foreground transition-colors hover:text-primary"
                 aria-hidden
               />
-              <div className="relative">
-                <Icons.Bell
-                  size={20}
-                  className="cursor-pointer text-muted-foreground transition-colors hover:text-primary"
-                  aria-hidden
-                />
-                <span className="absolute -right-1 -top-1 size-2 rounded-full border-2 border-card bg-red-500" />
-              </div>
+              <AgencyViolationBell />
             </div>
 
             <DropdownMenu>
@@ -181,6 +177,7 @@ export default function MainLayout() {
                 <DropdownMenuItem
                   onClick={() => {
                     localStorage.clear();
+                    window.dispatchEvent(new Event("smartdrive:auth"));
                     window.location.replace("/login");
                   }}
                   className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
@@ -199,5 +196,6 @@ export default function MainLayout() {
         </div>
       </main>
     </div>
+    </AgencySocketProvider>
   );
 }
