@@ -107,6 +107,8 @@ export default function CreateTripModal({ open, onOpenChange, onCreated }: Creat
 
   const form = useForm<CreateTripFormValues>({
     resolver: zodResolver(createTripFormSchema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       route_id: "",
       vehicle_id: "",
@@ -227,10 +229,15 @@ export default function CreateTripModal({ open, onOpenChange, onCreated }: Creat
     !Number.isNaN(new Date(departureTime).getTime());
 
   const selectsDisabled = routesLoading || !slotReady || availabilityLoading;
+  const noVehiclesInSlot = slotReady && !availabilityLoading && vehicles.length === 0;
+  const noDriversInSlot = slotReady && !availabilityLoading && drivers.length === 0;
+  const cannotPickVehicleOrDriver = noVehiclesInSlot || noDriversInSlot;
   const availabilityHint = !routesLoading && slotReady
     ? availabilityLoading
       ? "Đang kiểm tra lịch trống…"
-      : "Chỉ hiển thị xe và tài xế còn trống lịch trong khung giờ này."
+      : cannotPickVehicleOrDriver
+        ? "Không có xe hoặc không có tài xế trống lịch trong khung giờ này — đổi giờ xuất bến hoặc tuyến rồi thử lại."
+        : "Chỉ hiển thị xe và tài xế còn trống lịch trong khung giờ này."
     : "Chọn tuyến đường và giờ xuất bến để tải xe/tài xế khả dụng.";
 
   return (
@@ -304,7 +311,10 @@ export default function CreateTripModal({ open, onOpenChange, onCreated }: Creat
                 <Select
                   disabled={selectsDisabled}
                   value={field.value || undefined}
-                  onValueChange={field.onChange}
+                  onValueChange={(v) => {
+                    field.onChange(v);
+                    form.clearErrors("vehicle_id");
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue
@@ -344,7 +354,10 @@ export default function CreateTripModal({ open, onOpenChange, onCreated }: Creat
                 <Select
                   disabled={selectsDisabled}
                   value={field.value || undefined}
-                  onValueChange={field.onChange}
+                  onValueChange={(v) => {
+                    field.onChange(v);
+                    form.clearErrors("driver_id");
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue
@@ -378,7 +391,17 @@ export default function CreateTripModal({ open, onOpenChange, onCreated }: Creat
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Hủy
             </Button>
-            <Button type="submit" disabled={submitting || routesLoading || selectsDisabled}>
+            <Button
+              type="submit"
+              disabled={
+                submitting ||
+                routesLoading ||
+                selectsDisabled ||
+                cannotPickVehicleOrDriver ||
+                !form.watch("vehicle_id") ||
+                !form.watch("driver_id")
+              }
+            >
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -195,17 +195,20 @@ def send_violation_json(
     lat: Optional[float] = None,
     lng: Optional[float] = None,
     occurred_at_iso: Optional[str] = None,
+    device_api_key: Optional[str] = None,
 ) -> bool:
     """
     US_10 — POST JSON tới `/api/device/violation` (header `x-device-api-key`).
 
     Phải cung cấp đúng một trong hai: `image_base64` hoặc `image_url`.
 
+    :param device_api_key: Ghi đè `MASTER_DEVICE_API_KEY` (ví dụ từ `smartdrive_edge_ai` sau `load_dotenv`).
     :return: True nếu HTTP 2xx; False nếu lỗi (không ném exception ra ngoài).
     """
-    if not API_KEY:
+    key = (device_api_key or "").strip() or (API_KEY or "").strip() or os.getenv("MASTER_DEVICE_API_KEY", "").strip()
+    if not key:
         logger.warning(
-            "MASTER_DEVICE_API_KEY chưa được cấu hình — bỏ qua gửi vi phạm JSON.",
+            "MASTER_DEVICE_API_KEY chưa được cấu hình — bỏ qua gửi vi phạm JSON (thiếu header x-device-api-key).",
         )
         return False
 
@@ -244,11 +247,15 @@ def send_violation_json(
         payload["occurred_at"] = occurred_at_iso
 
     headers = {
-        "x-device-api-key": API_KEY,
+        "x-device-api-key": key,
         "Content-Type": "application/json",
     }
 
     try:
+        print("--- DEBUG THẺ TỪ ---")
+        print(f"Key thực tế chuẩn bị gửi: [{key}]")
+        print(f"Headers gửi đi: {headers}")
+        print("--------------------")
         resp = requests.post(
             VIOLATION_JSON_URL,
             json=payload,

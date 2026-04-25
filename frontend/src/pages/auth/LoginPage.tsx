@@ -115,6 +115,7 @@ export default function LoginPage() {
         localStorage.setItem("access_token", accessToken);
         localStorage.setItem("refresh_token", refreshToken || "");
         localStorage.setItem("user_info", JSON.stringify(user));
+        window.dispatchEvent(new Event("smartdrive:auth"));
 
         const role = user.role ?? "";
         const isAdmin = canAccessAdminDashboard(role);
