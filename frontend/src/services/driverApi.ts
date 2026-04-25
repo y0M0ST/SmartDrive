@@ -1,7 +1,15 @@
 import api from "./api";
 import type { DriverMyTripsPayload } from "@/types/driverPortal";
+import type { DriverViolationsPayload } from "@/types/driverViolations";
 
 export type MyTripsParams = {
+  page?: number;
+  limit?: number;
+};
+
+export type MyViolationsParams = {
+  month: string;
+  tripCode?: string;
   page?: number;
   limit?: number;
 };
@@ -29,6 +37,17 @@ export function unwrapFaceTemplate(res: { data?: { data?: DriverFaceTemplatePayl
   return inner as DriverFaceTemplatePayload;
 }
 
+/** US_16 — `{ data, meta }` nằm trong `response.data.data`. */
+export function unwrapDriverViolations(res: {
+  data?: { data?: DriverViolationsPayload };
+}): DriverViolationsPayload | null {
+  const inner = res.data?.data;
+  if (!inner || !Array.isArray(inner.data) || !inner.meta || typeof inner.meta.total !== "number") {
+    return null;
+  }
+  return inner as DriverViolationsPayload;
+}
+
 export const driverApi = {
   getUsers: (params?: Record<string, unknown>) => api.get("/users", { params }),
   createUser: (data: unknown) => api.post("/users", data),
@@ -42,6 +61,17 @@ export const driverApi = {
 
   /** US_15 — JWT DRIVER, không gửi driverId. */
   getMyTrips: (params?: MyTripsParams) => api.get("/driver/me/trips", { params }),
+
+  /** US_16 — Lịch sử vi phạm (bắt buộc `month=YYYY-MM`). */
+  getMyViolations: (params: MyViolationsParams) =>
+    api.get("/driver/violations", {
+      params: {
+        month: params.month,
+        ...(params.tripCode?.trim() ? { tripCode: params.tripCode.trim() } : {}),
+        page: params.page ?? 1,
+        limit: params.limit ?? 15,
+      },
+    }),
 
   /** US_18 — lấy mẫu vector (404 nếu chưa đăng ký). */
   getFaceTemplate: () => api.get("/driver/me/face-template"),
