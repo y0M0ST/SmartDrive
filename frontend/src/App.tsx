@@ -24,6 +24,7 @@ import DriverManagement from "./pages/DriverManagement";
 import VehicleManagement from "./pages/VehicleManagement";
 import AgencyDashboardPage from "./pages/agency/AgencyDashboardPage";
 import AgencyPlaceholderPage from "./pages/agency/AgencyPlaceholderPage";
+import AgencyDriverLeaderboardPage from "./pages/agency/AgencyDriverLeaderboardPage";
 import TripListPage from "./pages/trips/TripListPage";
 import ViolationListPage from "./pages/violations/ViolationListPage";
 import SuperAdminOverviewPage from "./pages/super-admin/SuperAdminOverviewPage";
@@ -193,10 +194,7 @@ function App() {
                 <Route path="accounts" element={<Navigate to="/admin/drivers" replace />} />
                 <Route path="trips" element={<TripListPage />} />
                 <Route path="violations" element={<ViolationListPage />} />
-                <Route
-                  path="ratings"
-                  element={<AgencyPlaceholderPage title="Đánh giá và xếp hạng" />}
-                />
+                <Route path="ratings" element={<AgencyDriverLeaderboardPage />} />
                 <Route
                   path="finance"
                   element={<AgencyPlaceholderPage title="Thống kê thu nhập & báo cáo" />}
