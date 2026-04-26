@@ -1,5 +1,5 @@
 /**
- * US_16 — Payload `GET /api/driver/violations` (ServiceResponse bọc ngoài: `data.data` + `data.meta`).
+ * US_16 — Payload `GET /api/driver/me/violations` (hoặc `/api/driver/violations`; ServiceResponse: `data.data` + `data.meta`).
  * Khớp `DriverViolationListItem` từ `driver-portal.service.ts`.
  */
 export type DriverViolationCoordinates = {

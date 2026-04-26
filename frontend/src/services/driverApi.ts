@@ -81,15 +81,15 @@ export const driverApi = {
   /** US_15 — JWT DRIVER, không gửi driverId. */
   getMyTrips: (params?: MyTripsParams) => api.get("/driver/me/trips", { params }),
 
-  /** US_17 — Thống kê điểm an toàn & thu nhập dự kiến (`month` tuỳ chọn). */
+  /** US_17 — Thống kê (`month` tuỳ chọn). BE: `/driver/me/statistics` hoặc `/driver/statistics`. */
   getStatistics: (params?: DriverStatisticsParams) =>
-    api.get("/driver/statistics", {
+    api.get("/driver/me/statistics", {
       params: params?.month?.trim() ? { month: params.month.trim() } : {},
     }),
 
-  /** US_16 — Lịch sử vi phạm (bắt buộc `month=YYYY-MM`). */
+  /** US_16 — Lịch sử vi phạm (bắt buộc `month=YYYY-MM`). BE: `/driver/me/violations` hoặc `/driver/violations`. */
   getMyViolations: (params: MyViolationsParams) =>
-    api.get("/driver/violations", {
+    api.get("/driver/me/violations", {
       params: {
         month: params.month,
         ...(params.tripCode?.trim() ? { tripCode: params.tripCode.trim() } : {}),

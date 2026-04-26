@@ -1,4 +1,4 @@
-import { endOfMonth, subMonths } from "date-fns";
+import { endOfMonth, endOfQuarter, startOfQuarter, subDays, subMonths } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
 export const VN_IANA = "Asia/Ho_Chi_Minh";
@@ -25,6 +25,28 @@ export function vnCurrentFullMonthRangeYmd(): { from: string; to: string } {
   const mid = new Date(Date.UTC(y, m0, 15, 12, 0, 0));
   const to = formatInTimeZone(endOfMonth(mid), VN_IANA, "yyyy-MM-dd");
   return { from: `${ym}-01`, to };
+}
+
+/** 7 ngày gần nhất theo lịch VN (từ −6 đến hôm nay, inclusive). */
+export function vnRolling7DaysRangeYmd(): { from: string; to: string } {
+  const to = vnTodayYmd();
+  const toNoon = parseYmdUtcNoon(to);
+  const fromNoon = subDays(toNoon, 6);
+  return {
+    from: formatInTimeZone(fromNoon, VN_IANA, "yyyy-MM-dd"),
+    to,
+  };
+}
+
+/** Quý lịch chứa “hôm nay” theo múi VN (đầu quý → cuối quý). */
+export function vnCurrentQuarterRangeYmd(): { from: string; to: string } {
+  const anchor = parseYmdUtcNoon(vnTodayYmd());
+  const start = startOfQuarter(anchor);
+  const end = endOfQuarter(anchor);
+  return {
+    from: formatInTimeZone(start, VN_IANA, "yyyy-MM-dd"),
+    to: formatInTimeZone(end, VN_IANA, "yyyy-MM-dd"),
+  };
 }
 
 /** Danh sách `YYYY-MM` từ `monthsBack` tháng trước đến tháng hiện tại (VN), mới nhất trước. */

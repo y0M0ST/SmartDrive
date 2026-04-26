@@ -5,11 +5,13 @@ export type AgencyReportQueryParams = {
   startDate: string;
   endDate: string;
   driverId?: string;
+  violationType?: "DROWSY" | "DISTRACTED";
 };
 
 function buildParams(p: AgencyReportQueryParams): Record<string, string> {
   const out: Record<string, string> = { startDate: p.startDate, endDate: p.endDate };
   if (p.driverId) out.driverId = p.driverId;
+  if (p.violationType) out.violationType = p.violationType;
   return out;
 }
 

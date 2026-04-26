@@ -111,6 +111,8 @@ router.get('/me/trips', validate(getMyTripsQuerySchema), driverPortalController.
  *         description: Lỗi máy chủ
  */
 router.get('/violations', validate(driverViolationsQuerySchema), driverPortalController.getMyViolations);
+/** Cùng handler với `/violations` — khớp quy ước `/me/*` như lịch trình tài xế. */
+router.get('/me/violations', validate(driverViolationsQuerySchema), driverPortalController.getMyViolations);
 
 /**
  * @swagger
@@ -126,6 +128,7 @@ router.get('/violations', validate(driverViolationsQuerySchema), driverPortalCon
  *       của nhà xe (`users.agency_id`). Công thức:
  *       `monthly_estimated_income_vnd = max(0, base + completed_trips * bonus - total_deducted_points * penalty)`.
  *       `total_deducted_points` ưu tiên từ `driver_scores` (tháng đó), nếu chưa có bản ghi thì cộng từ `ai_violations` + `violation_configs`.
+ *       `violations_drowsy_in_month` / `violations_distracted_in_month` đếm từ `ai_violations`; `total_violations_in_month` ưu tiên `driver_scores` nếu có.
  *
  *       **Biểu đồ theo tuần:** tháng được chia thành các khúc 7 ngày liên tiếp từ ngày 1 (tuần cuối có thể ngắn hơn).
  *       - `charts.safety_score_by_week[].score` = `max(0, 100 - tổng điểm trừ vi phạm trong tuần)` (xu hướng theo vi phạm).
@@ -234,6 +237,8 @@ router.get('/violations', validate(driverViolationsQuerySchema), driverPortalCon
  *         description: Lỗi máy chủ
  */
 router.get('/statistics', validate(driverStatisticsQuerySchema), driverPortalController.getDriverStatistics);
+/** Cùng handler với `/statistics` — khớp US_17 (`/api/driver/me/statistics`). */
+router.get('/me/statistics', validate(driverStatisticsQuerySchema), driverPortalController.getDriverStatistics);
 
 /**
  * @swagger

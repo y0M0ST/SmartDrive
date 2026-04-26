@@ -1,7 +1,7 @@
 /**
  * US_16 — Lịch sử vi phạm cá nhân (Cổng tài xế).
  *
- * PHẦN 1 — Khám sức khỏe Backend (GET /api/driver/violations):
+ * PHẦN 1 — Backend: `GET /api/driver/me/violations` (hoặc `/api/driver/violations`, cùng handler):
  * 1) Trường UI: `id`, `occurred_at` (ISO string), `trip_code`, `type`, `image_url`,
  *    `coordinates: { latitude, longitude }` (+ `trip_id`). Đủ cho thẻ + lightbox.
  * 2) Phân trang: `{ data: [...], meta: { total, page, limit, totalPages } }` trong

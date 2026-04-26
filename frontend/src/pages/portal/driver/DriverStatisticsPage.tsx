@@ -1,8 +1,9 @@
 /**
  * US_17 — Thống kê điểm an toàn & thu nhập dự kiến (Cổng tài xế).
  *
- * PHẦN 1 — Backend `GET /api/driver/statistics` (không sửa BE):
- * 1) Cards: `final_safety_score` (0–100 hoặc null), `completed_trips`, `total_violations_in_month` (null nếu chưa có driver_scores),
+ * PHẦN 1 — Backend `GET /api/driver/me/statistics` (hoặc `/api/driver/statistics`):
+ * 1) Cards: `final_safety_score` (0–100 hoặc null), `completed_trips`, `total_violations_in_month`,
+ *    `violations_drowsy_in_month` / `violations_distracted_in_month`,
  *    `monthly_estimated_income_vnd`, cộng thêm `salary_configured`, hệ số lương nullable.
  * 2) Charts: `charts.safety_score_by_week[]` (week_index, label, score, deducted_points, trips_completed) và
  *    `charts.estimated_income_by_week[]` (estimated_income_vnd, ...).
@@ -55,6 +56,9 @@ function hasMeaningfulStatistics(c: DriverStatisticsPayload["cards"]): boolean {
   if (finiteOr(c.completed_trips, 0) > 0) return true;
   if (finiteOr(c.total_deducted_points, 0) > 0) return true;
   if (finiteOr(c.total_violations_in_month, 0) > 0) return true;
+  if (finiteOr(c.violations_drowsy_in_month, 0) > 0 || finiteOr(c.violations_distracted_in_month, 0) > 0) {
+    return true;
+  }
   const fs = c.final_safety_score;
   if (fs != null && Number.isFinite(fs) && fs < 100) return true;
   return false;
@@ -204,11 +208,21 @@ export default function DriverStatisticsPage() {
   const tripsDisplay = useMemo(() => String(finiteOr(cards?.completed_trips, 0)), [cards?.completed_trips]);
 
   const violationsDisplay = useMemo(() => {
-    const v = cards?.total_violations_in_month;
-    if (v == null) return "—";
+    if (!cards) return "—";
+    let v = cards.total_violations_in_month;
+    if (v == null || !Number.isFinite(v)) {
+      v = finiteOr(cards.violations_drowsy_in_month, 0) + finiteOr(cards.violations_distracted_in_month, 0);
+    }
     if (!Number.isFinite(v)) return "—";
     return String(Math.round(v));
-  }, [cards?.total_violations_in_month]);
+  }, [cards]);
+
+  const violationsHint = useMemo(() => {
+    if (!cards) return undefined;
+    const d = finiteOr(cards.violations_drowsy_in_month, 0);
+    const di = finiteOr(cards.violations_distracted_in_month, 0);
+    return `Buồn ngủ: ${d} · Mất tập trung: ${di}`;
+  }, [cards]);
 
   const incomeDisplay = useMemo(() => {
     return VND_FULL.format(finiteOr(cards?.monthly_estimated_income_vnd, 0));
@@ -283,7 +297,7 @@ export default function DriverStatisticsPage() {
           className={cn("ring-2 ring-inset", scoreStyle.box)}
         />
         <StatCard title="Tổng chuyến (hoàn thành)" value={tripsDisplay} hint="Trong tháng đã chọn." />
-        <StatCard title="Tổng vi phạm" value={violationsDisplay} hint="Theo bản ghi tháng (nếu có)." />
+        <StatCard title="Tổng vi phạm" value={violationsDisplay} hint={violationsHint} />
         <StatCard
           title="Thu nhập dự kiến"
           value={incomeDisplay}

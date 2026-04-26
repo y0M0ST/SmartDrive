@@ -29,15 +29,20 @@ export function ScoreBarCell({ finalScore }: ScoreBarCellProps) {
           ? "bg-amber-400"
           : "bg-emerald-500";
 
-  /** Chỉ khi điểm ≤ 0: cảnh báo HR (theo spec). */
+  /** Điểm đã clamp 0–100 trên BE; khi về 0: cảnh báo HR nổi bật (không tự đình chỉ). */
   const showHrWarn = finalScore <= 0;
 
   return (
     <div className="flex min-w-[120px] max-w-[220px] flex-col gap-1">
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-sm font-black tabular-nums text-foreground">{Math.round(finalScore)}</span>
         {showHrWarn ? (
-          <AlertTriangle className="size-4 shrink-0 text-red-600 dark:text-red-400" aria-label="Cảnh báo: Khuyến nghị HR xem xét" />
+          <>
+            <AlertTriangle className="size-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+            <span className="text-[11px] font-bold leading-tight text-red-600 dark:text-red-400">
+              Khuyến nghị HR xem xét
+            </span>
+          </>
         ) : null}
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">

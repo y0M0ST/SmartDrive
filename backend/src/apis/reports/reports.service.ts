@@ -168,9 +168,26 @@ export type DriverExportRow = {
     username: string;
     full_name: string;
     completed_trips: number;
+    violations_drowsy: number;
+    violations_distracted: number;
     violations: number;
     total_deducted: number;
     final_score: number | null;
+    safety_band: string;
+};
+
+/** Ngưỡng xếp loại (khớp bảng điểm / leaderboard UI); không lấy từ DB. */
+const safetyBandLabel = (finalScore: number | null): string => {
+    if (finalScore == null || !Number.isFinite(finalScore)) {
+        return 'Chưa có dữ liệu';
+    }
+    if (finalScore >= 80) {
+        return 'Tốt';
+    }
+    if (finalScore >= 50) {
+        return 'Cần chú ý';
+    }
+    return 'Nguy cơ cao';
 };
 
 async function fetchDriverExportRows(
@@ -196,6 +213,9 @@ async function fetchDriverExportRows(
         idx += 1;
     }
 
+    const drowsyScope = violationType === ViolationType.DISTRACTED ? ' AND 1=0' : '';
+    const distractedScope = violationType === ViolationType.DROWSY ? ' AND 1=0' : '';
+
     const sql = `
 SELECT u.username AS username,
        u.full_name AS full_name,
@@ -203,6 +223,16 @@ SELECT u.username AS username,
         WHERE t.agency_id = $1 AND t.driver_id = u.id AND t.status = 'COMPLETED'
           AND t.actual_end_time IS NOT NULL
           AND t.actual_end_time >= $2 AND t.actual_end_time <= $3) AS completed_trips,
+       (SELECT COUNT(*)::int FROM ai_violations av
+        INNER JOIN trips t ON t.id = av.trip_id
+        WHERE t.agency_id = $1 AND av.driver_id = u.id
+          AND av.occurred_at >= $2 AND av.occurred_at <= $3
+          AND av.type = 'DROWSY'${drowsyScope}) AS violations_drowsy,
+       (SELECT COUNT(*)::int FROM ai_violations av
+        INNER JOIN trips t ON t.id = av.trip_id
+        WHERE t.agency_id = $1 AND av.driver_id = u.id
+          AND av.occurred_at >= $2 AND av.occurred_at <= $3
+          AND av.type = 'DISTRACTED'${distractedScope}) AS violations_distracted,
        (SELECT COUNT(*)::int FROM ai_violations av
         INNER JOIN trips t ON t.id = av.trip_id
         WHERE t.agency_id = $1 AND av.driver_id = u.id
@@ -221,14 +251,20 @@ WHERE u.agency_id = $1 AND r.name = 'DRIVER' ${driverSql}
 ORDER BY u.username`;
 
     const raw = await AppDataSource.query(sql, params);
-    return (raw as Record<string, unknown>[]).map((row) => ({
-        username: String(row.username),
-        full_name: String(row.full_name),
-        completed_trips: Number(row.completed_trips ?? 0),
-        violations: Number(row.violations ?? 0),
-        total_deducted: Number(row.total_deducted ?? 0),
-        final_score: row.final_score != null && row.final_score !== '' ? Number(row.final_score) : null,
-    }));
+    return (raw as Record<string, unknown>[]).map((row) => {
+        const finalScore = row.final_score != null && row.final_score !== '' ? Number(row.final_score) : null;
+        return {
+            username: String(row.username),
+            full_name: String(row.full_name),
+            completed_trips: Number(row.completed_trips ?? 0),
+            violations_drowsy: Number(row.violations_drowsy ?? 0),
+            violations_distracted: Number(row.violations_distracted ?? 0),
+            violations: Number(row.violations ?? 0),
+            total_deducted: Number(row.total_deducted ?? 0),
+            final_score: finalScore,
+            safety_band: safetyBandLabel(finalScore),
+        };
+    });
 }
 
 export async function getExportRowsForAgency(agencyId: string, q: AgencyReportQueryInput): Promise<{
@@ -267,9 +303,12 @@ export async function buildAgencyReportExcelBuffer(
         { header: 'Ma tai xe', key: 'username', width: 18 },
         { header: 'Ho ten', key: 'full_name', width: 28 },
         { header: 'Tong chuyen hoan thanh', key: 'completed_trips', width: 22 },
-        { header: 'So loi AI', key: 'violations', width: 14 },
+        { header: 'Loi buon ngu', key: 'violations_drowsy', width: 14 },
+        { header: 'Loi mat tap trung', key: 'violations_distracted', width: 18 },
+        { header: 'Tong loi (theo bo loc)', key: 'violations', width: 18 },
         { header: 'Tong diem tru', key: 'total_deducted', width: 16 },
         { header: 'Diem an toan cuoi ky', key: 'final_score', width: 22 },
+        { header: 'Xep loai (nguong 80/50, mac dinh UI)', key: 'safety_band', width: 26 },
     ];
     ws.getRow(1).font = { bold: true };
     for (const r of rows) {
@@ -277,9 +316,12 @@ export async function buildAgencyReportExcelBuffer(
             username: r.username,
             full_name: r.full_name,
             completed_trips: r.completed_trips,
+            violations_drowsy: r.violations_drowsy,
+            violations_distracted: r.violations_distracted,
             violations: r.violations,
             total_deducted: r.total_deducted,
             final_score: r.final_score ?? 'N/A',
+            safety_band: r.safety_band,
         });
     }
     const buf = await wb.xlsx.writeBuffer();

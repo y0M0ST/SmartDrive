@@ -7,6 +7,7 @@ Chạy thử (webcam laptop, backend đang mở):
   copy .env.example .env   # điền MASTER_DEVICE_API_KEY, CURRENT_TRIP_ID, SMARTDRIVE_DEVICE_VIOLATION_JSON_URL
   pip install -r requirements.txt   # gồm pygame — phát alarm_drowsy.wav / alarm_distracted.wav nếu có
   # Đặt hai file WAV cạnh smartdrive_edge_ai.py (hoặc chỉnh EDGE_ALARM_*_WAV trong .env)
+  # Tuỳ chọn: EDGE_ALARM_VOLUME=0.0–1.0, EDGE_AUDIO_RECOVERY_HOLD_SEC (mặc định ~0.35s — giữ còi thêm sau khi tài xế đã ổn định)
   python smartdrive_edge_ai.py
 
 Test mất mạng (US_21): tắt Node, gây vi phạm → kiểm tra `database/violation_queue.db` và `cache/*.jpg`;
@@ -204,6 +205,8 @@ def main() -> int:
     drowsy_hold = float(os.getenv("EDGE_DROWSY_HOLD_SEC", "1.2"))
     pose_deg = float(os.getenv("EDGE_POSE_DEG_THRESHOLD", "30"))
     pose_hold = float(os.getenv("EDGE_DISTRACTED_HOLD_SEC", "1.0"))
+    alarm_volume = float(os.getenv("EDGE_ALARM_VOLUME", "1.0"))
+    audio_recovery = float(os.getenv("EDGE_AUDIO_RECOVERY_HOLD_SEC", "0.35"))
     sync_interval = float(os.getenv("EDGE_SYNC_INTERVAL_SEC", "2.0"))
     sync_batch = int(os.getenv("EDGE_SYNC_BATCH_SIZE", "6"))
     health_url = (os.getenv("SMARTDRIVE_DEVICE_VIOLATION_JSON_URL") or "").strip()
@@ -223,6 +226,7 @@ def main() -> int:
         stop_ev,
         drowsy_wav=(os.getenv("EDGE_ALARM_DROWSY_WAV") or "alarm_drowsy.wav").strip(),
         distracted_wav=(os.getenv("EDGE_ALARM_DISTRACTED_WAV") or "alarm_distracted.wav").strip(),
+        volume=alarm_volume,
     )
     audio_alarm.start()
     pm = PersistenceManager()
@@ -258,14 +262,17 @@ def main() -> int:
     sent_pose = False
     pending_hud = pm.pending_count()
     hud_tick = 0
+    audio_clear_since: Optional[float] = None
 
     logger.info(
-        "Edge AI bật | trip=%s… | EAR<thresh %.2f %.1fs | pose>%.0f° %.1fs | SQLite pending=%s",
+        "Edge AI bật | trip=%s… | EAR<thresh %.2f %.1fs | pose>%.0f° %.1fs | alarm_vol=%.2f audio_rec=%.2fs | SQLite pending=%s",
         trip_id[:8],
         ear_thresh,
         drowsy_hold,
         pose_deg,
         pose_hold,
+        max(0.0, min(1.0, alarm_volume)),
+        audio_recovery,
         pm.pending_count(),
     )
 
@@ -316,6 +323,7 @@ def main() -> int:
                 p_bad_since = None
                 drowsy_active = False
                 pose_active = False
+                audio_clear_since = None
                 audio_alarm.set_alarm(None)
                 cv2.putText(frame, "NO FACE", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 2)
                 cv2.imshow("SmartDrive Edge AI (US_19) — q: thoát", frame)
@@ -346,13 +354,23 @@ def main() -> int:
             if not pose_active:
                 sent_pose = False
 
-            # Âm thanh (US_19): DISTRACTED ưu tiên — pygame thread; về OK → set None tắt ngay
-            if pose_active:
-                audio_alarm.set_alarm("DISTRACTED")
-            elif drowsy_active:
-                audio_alarm.set_alarm("DROWSY")
+            # Âm thanh (US_19): DISTRACTED ưu tiên — pygame thread; khi hết nguy cơ, giữ thêm EDGE_AUDIO_RECOVERY_HOLD_SEC (0 = tắt ngay)
+            threat_audio = pose_active or drowsy_active
+            if threat_audio:
+                audio_clear_since = None
+                if pose_active:
+                    audio_alarm.set_alarm("DISTRACTED")
+                elif drowsy_active:
+                    audio_alarm.set_alarm("DROWSY")
             else:
-                audio_alarm.set_alarm(None)
+                if audio_recovery <= 0:
+                    audio_alarm.set_alarm(None)
+                else:
+                    if audio_clear_since is None:
+                        audio_clear_since = now
+                    elif (now - audio_clear_since) >= audio_recovery:
+                        audio_alarm.set_alarm(None)
+                        audio_clear_since = None
 
             # US_21 — Ghi SQLite + ảnh disk (rising edge + latch)
             occurred_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

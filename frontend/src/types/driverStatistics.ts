@@ -1,5 +1,5 @@
 /**
- * US_17 — `GET /api/driver/statistics` (ServiceResponse: `response.data.data`).
+ * US_17 — `GET /api/driver/me/statistics` (hoặc `/api/driver/statistics`; ServiceResponse: `response.data.data`).
  * Khớp payload `getDriverMonthlyStatistics` trong `driver-statistics.service.ts`.
  */
 export type DriverStatisticsCards = {
@@ -10,6 +10,9 @@ export type DriverStatisticsCards = {
   penalty_per_point_vnd: number | null;
   completed_trips: number;
   total_deducted_points: number;
+  /** Đếm từ `ai_violations` trong tháng (theo loại). */
+  violations_drowsy_in_month?: number;
+  violations_distracted_in_month?: number;
   total_violations_in_month: number | null;
   /** Điểm tổng tháng từ `driver_scores` (0–100); `null` nếu chưa có bản ghi. */
   final_safety_score: number | null;

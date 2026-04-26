@@ -4,6 +4,7 @@ US_19 — Phát cảnh báo âm thanh tại chỗ (WAV) không chặn vòng lặ
 - `pygame.mixer` chạy trên **thread daemon riêng**; main thread chỉ gọi `set_alarm(kind)`.
 - `set_alarm(None)` → `pygame.mixer.stop()` — âm thanh tắt ngay khi tài xế về trạng thái bình thường.
 - Thiếu file `.wav` hoặc lỗi load: **Warning**, không ném exception ra main.
+- `volume` 0.0–1.0 (pygame `Sound.set_volume`) — cấu hình từ biến môi trường phía caller.
 """
 
 from __future__ import annotations
@@ -32,11 +33,13 @@ class AudioAlarmManager:
         *,
         drowsy_wav: str = "alarm_drowsy.wav",
         distracted_wav: str = "alarm_distracted.wav",
+        volume: float = 1.0,
     ) -> None:
         self._base = base_dir
         self._stop = stop_event
         self._drowsy_name = drowsy_wav
         self._dist_name = distracted_wav
+        self._volume = max(0.0, min(1.0, float(volume)))
         self._lock = threading.Lock()
         self._desired: Optional[str] = None  # "DROWSY" | "DISTRACTED" | None
         self._thread: Optional[threading.Thread] = None
@@ -81,6 +84,10 @@ class AudioAlarmManager:
         if dpath.is_file():
             try:
                 drowsy_sound = pygame.mixer.Sound(str(dpath))
+                try:
+                    drowsy_sound.set_volume(self._volume)
+                except Exception:
+                    pass
             except Exception as e:  # noqa: BLE001
                 logger.warning("Không load được %s: %s", dpath.name, e)
         else:
@@ -89,6 +96,10 @@ class AudioAlarmManager:
         if ppath.is_file():
             try:
                 dist_sound = pygame.mixer.Sound(str(ppath))
+                try:
+                    dist_sound.set_volume(self._volume)
+                except Exception:
+                    pass
             except Exception as e:  # noqa: BLE001
                 logger.warning("Không load được %s: %s", ppath.name, e)
         else:

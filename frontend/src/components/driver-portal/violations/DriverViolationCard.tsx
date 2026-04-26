@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { ImageOff, MapPin } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import type { DriverViolationListItem } from "@/types/driverViolations";
@@ -47,7 +48,10 @@ export function DriverViolationCard({ item, onOpenDetail }: DriverViolationCardP
               loading="lazy"
               decoding="async"
               className="size-full object-cover"
-              onError={() => setImgFailed(true)}
+              onError={() => {
+                setImgFailed(true);
+                toast.warning("Không tải được ảnh xem nhanh.", { id: "driver-violation-thumb-load" });
+              }}
             />
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-1 bg-muted px-1 text-center">

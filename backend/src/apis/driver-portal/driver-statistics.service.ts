@@ -84,6 +84,37 @@ async function sumDeductedPointsInRange(driverId: string, from: Date, to: Date):
     return Number(raw?.s ?? 0);
 }
 
+/** Đếm vi phạm theo loại trong khoảng (US_17 — hiển thị buồn ngủ / mất tập trung). */
+async function countViolationsByTypeInRange(
+    driverId: string,
+    from: Date,
+    to: Date,
+): Promise<{ drowsy: number; distracted: number }> {
+    const vioRepo = AppDataSource.getRepository(AiViolation);
+    const rows = await vioRepo
+        .createQueryBuilder('v')
+        .select('v.type', 'type')
+        .addSelect('COUNT(*)', 'cnt')
+        .innerJoin('v.trip', 't')
+        .where('v.driver_id = :driverId', { driverId })
+        .andWhere('t.driver_id = :driverId', { driverId })
+        .andWhere('v.occurred_at BETWEEN :from AND :to', { from, to })
+        .groupBy('v.type')
+        .getRawMany<{ type: string; cnt: string }>();
+    let drowsy = 0;
+    let distracted = 0;
+    for (const r of rows) {
+        const n = Number(r.cnt ?? 0);
+        if (r.type === 'DROWSY') {
+            drowsy = n;
+        }
+        if (r.type === 'DISTRACTED') {
+            distracted = n;
+        }
+    }
+    return { drowsy, distracted };
+}
+
 /**
  * US_17 — Thống kê điểm an toàn & thu nhập dự kiến (chỉ dữ liệu của `driverUserId`).
  */
@@ -125,10 +156,17 @@ export async function getDriverMonthlyStatistics(driverUserId: string, evaluatio
         monthFrom,
         monthTo,
     );
+    const { drowsy: vDrowsy, distracted: vDistracted } = await countViolationsByTypeInRange(
+        driverUserId,
+        monthFrom,
+        monthTo,
+    );
+    const violationsSumAi = vDrowsy + vDistracted;
 
     const totalDeductedPoints =
         scoreRow != null ? scoreRow.total_deducted_points : deductedFromViolationsMonth;
     const finalSafetyScore = scoreRow != null ? scoreRow.final_score : null;
+    const totalViolationsDisplay = scoreRow != null ? scoreRow.total_violations : violationsSumAi;
 
     const base = salary?.base_salary ?? 0;
     const bonus = salary?.bonus_per_trip ?? 0;
@@ -183,7 +221,10 @@ export async function getDriverMonthlyStatistics(driverUserId: string, evaluatio
             penalty_per_point_vnd: salary ? salary.penalty_per_point : null,
             completed_trips: completedTripsMonth,
             total_deducted_points: totalDeductedPoints,
-            total_violations_in_month: scoreRow?.total_violations ?? null,
+            violations_drowsy_in_month: vDrowsy,
+            violations_distracted_in_month: vDistracted,
+            /** Ưu tiên `driver_scores`; nếu chưa có bản ghi tháng thì lấy tổng sự kiện AI trong tháng. */
+            total_violations_in_month: totalViolationsDisplay,
             final_safety_score: finalSafetyScore,
             monthly_estimated_income_vnd: monthlyEstimatedIncomeVnd,
         },
@@ -205,7 +246,9 @@ function buildEmptyPayload(evaluationMonth: string, salaryConfigured: boolean) {
             penalty_per_point_vnd: null,
             completed_trips: 0,
             total_deducted_points: 0,
-            total_violations_in_month: null,
+            violations_drowsy_in_month: 0,
+            violations_distracted_in_month: 0,
+            total_violations_in_month: 0,
             final_safety_score: null,
             monthly_estimated_income_vnd: 0,
         },
