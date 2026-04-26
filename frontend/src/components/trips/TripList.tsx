@@ -1,6 +1,14 @@
 import { Eye, Loader2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -12,12 +20,16 @@ import {
 import type { TripRow } from "@/types/trip";
 import { TRIP_STATUS_LABEL, tripStatusBadgeCn } from "@/lib/tripStatusDisplay";
 
+export type TripStatusFilterValue = "" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+
 type TripListProps = {
   trips: TripRow[];
   loading: boolean;
   resolveProvinceName: (code: string) => string;
   onCreateClick: () => void;
   onTripDetailClick: (tripId: string) => void;
+  statusFilter: TripStatusFilterValue;
+  onStatusFilterChange: (v: TripStatusFilterValue) => void;
 };
 
 function formatDeparture(iso: string): string {
@@ -38,6 +50,8 @@ export default function TripList({
   resolveProvinceName,
   onCreateClick,
   onTripDetailClick,
+  statusFilter,
+  onStatusFilterChange,
 }: TripListProps) {
   return (
     <div className="space-y-4">
@@ -52,6 +66,28 @@ export default function TripList({
           <Plus className="h-4 w-4" />
           Tạo chuyến đi
         </Button>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:max-w-xs">
+        <Label htmlFor="trip-status-filter" className="text-xs font-semibold text-muted-foreground">
+          Lọc theo trạng thái
+        </Label>
+        <Select
+          value={statusFilter || "__all__"}
+          onValueChange={(v) => onStatusFilterChange(v === "__all__" ? "" : (v as TripStatusFilterValue))}
+          disabled={loading}
+        >
+          <SelectTrigger id="trip-status-filter" className="h-10 w-full sm:max-w-xs">
+            <SelectValue placeholder="Tất cả" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Tất cả</SelectItem>
+            <SelectItem value="SCHEDULED">{TRIP_STATUS_LABEL.SCHEDULED}</SelectItem>
+            <SelectItem value="IN_PROGRESS">{TRIP_STATUS_LABEL.IN_PROGRESS}</SelectItem>
+            <SelectItem value="COMPLETED">{TRIP_STATUS_LABEL.COMPLETED}</SelectItem>
+            <SelectItem value="CANCELLED">{TRIP_STATUS_LABEL.CANCELLED}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-sm">
