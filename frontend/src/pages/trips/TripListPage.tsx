@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import TripList from "@/components/trips/TripList";
+import TripList, { type TripStatusFilterValue } from "@/components/trips/TripList";
 import CreateTripModal from "@/components/trips/CreateTripModal";
 import TripDetailModal from "@/components/trips/TripDetailModal";
 import { tripApi } from "@/services/tripApi";
@@ -52,6 +52,7 @@ export default function TripListPage() {
   const [trips, setTrips] = useState<TripRow[]>([]);
   const [meta, setMeta] = useState<ListMeta>({ total: 0, currentPage: 1, totalPages: 1 });
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<TripStatusFilterValue>("");
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTripId, setDetailTripId] = useState<string | null>(null);
@@ -72,7 +73,11 @@ export default function TripListPage() {
   const fetchTrips = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await tripApi.getList({ page, limit: PAGE_SIZE });
+      const res = await tripApi.getList({
+        page,
+        limit: PAGE_SIZE,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      });
       const { trips: rows, meta: m } = unwrapTripList(res);
       setTrips(rows);
       setMeta(m);
@@ -83,11 +88,16 @@ export default function TripListPage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, statusFilter]);
 
   useEffect(() => {
     void fetchTrips();
   }, [fetchTrips]);
+
+  const onStatusFilterChange = useCallback((v: TripStatusFilterValue) => {
+    setStatusFilter(v);
+    setPage(1);
+  }, []);
 
   const openTripDetail = useCallback((id: string) => {
     setDetailTripId(id);
@@ -103,7 +113,11 @@ export default function TripListPage() {
     setPage(1);
     setLoading(true);
     try {
-      const res = await tripApi.getList({ page: 1, limit: PAGE_SIZE });
+      const res = await tripApi.getList({
+        page: 1,
+        limit: PAGE_SIZE,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      });
       const { trips: rows, meta: m } = unwrapTripList(res);
       setTrips(rows);
       setMeta(m);
@@ -112,7 +126,7 @@ export default function TripListPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     (async () => {
@@ -135,6 +149,8 @@ export default function TripListPage() {
             resolveProvinceName={resolveProvinceName}
             onCreateClick={() => setModalOpen(true)}
             onTripDetailClick={openTripDetail}
+            statusFilter={statusFilter}
+            onStatusFilterChange={onStatusFilterChange}
           />
 
           {meta.totalPages > 1 ? (

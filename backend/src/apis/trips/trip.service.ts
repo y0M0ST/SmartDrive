@@ -111,7 +111,9 @@ export const getAvailableVehicles = async (agencyId: string, q: AvailableSlotQue
         where: { agency_id: agencyId },
         order: { license_plate: 'ASC' },
     });
-    const candidates = vehicles.filter((v) => v.status !== VehicleStatus.MAINTENANCE);
+    const candidates = vehicles.filter(
+        (v) => v.status !== VehicleStatus.MAINTENANCE && v.status !== VehicleStatus.INACTIVE,
+    );
     const out: AvailableVehicleDto[] = [];
     for (const v of candidates) {
         const busy = await hasVehicleTripOverlap(agencyId, v.id, q.departure_time, q.planned_end_time);
@@ -188,6 +190,9 @@ export const createTrip = async (createTripDto: CreateTripInput, agencyId: strin
     if (vehicle.status === VehicleStatus.MAINTENANCE) {
         throw new BadRequestException('Xe đang trong trạng thái bảo dưỡng, không thể xếp chuyến.');
     }
+    if (vehicle.status === VehicleStatus.INACTIVE) {
+        throw new BadRequestException('Xe không khả dụng (ngừng hoạt động), không thể xếp chuyến.');
+    }
 
     const driver = await userRepo.findOne({
         where: { id: createTripDto.driver_id, agency_id: agencyId },
@@ -198,6 +203,9 @@ export const createTrip = async (createTripDto: CreateTripInput, agencyId: strin
     }
     if (driver.role.name !== DRIVER_ROLE_NAME) {
         throw new BadRequestException('Người dùng được chọn không phải tài xế (DRIVER).');
+    }
+    if (driver.status !== UserStatus.ACTIVE) {
+        throw new BadRequestException('Tài xế không ở trạng thái hoạt động, không thể xếp chuyến.');
     }
 
     // validate.middleware chỉ parse Zod, không gán lại req.body → departure_time thường vẫn là chuỗi ISO.
