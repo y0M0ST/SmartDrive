@@ -4,7 +4,7 @@ US_21 — Hàng đợi vi phạm bền vững (SQLite + ảnh trên đĩa), đ�
 - `enqueue_violation`: ghi DB + lưu JPEG vào `cache/`.
 - `get_next_batch`: FIFO theo `id`.
 - `mark_as_sent`: xóa hàng + xóa file ảnh (ACK HTTP 2xx từ `api_client.send_violation_json`).
-- `prune_cache_orphans` + `_enforce_storage_limits_post_prune`: xóa mồ côi; tùy chọn cap số pending / evict FIFO khi cache vượt ngưỡng (xem `.env`).
+- `prune_cache_orphans` + `_enforce_storage_limits_post_prune`: xóa file **mồ côi** (không còn trong queue); mặc định **không** xóa bản pending chưa ACK khi đầy ổ — chỉ cảnh báo (US_21). Tùy chọn `PERSISTENCE_EVICT_PENDING_ON_PRESSURE=1` để bật evict FIFO cũ (mất bằng chứng chưa gửi).
 """
 
 from __future__ import annotations
@@ -69,6 +69,11 @@ class PersistenceManager:
         self._max_pending_warn = int(os.getenv("PERSISTENCE_MAX_PENDING_WARN", str(max_pending_warn)))
         # 0 = tắt cap (mặc định). Đặt >0 để giới hạn số bản ghi chưa sync (FIFO evict cũ nhất).
         self._max_pending_records = int(os.getenv("PERSISTENCE_MAX_PENDING_RECORDS", "0"))
+        self._evict_pending_on_pressure = os.getenv("PERSISTENCE_EVICT_PENDING_ON_PRESSURE", "0").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         self._lock = threading.RLock()
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -202,8 +207,8 @@ class PersistenceManager:
 
     def evict_oldest_pending(self, *, reason: str) -> bool:
         """
-        Xóa **một** bản ghi pending cũ nhất (FIFO theo `id`) + ảnh — dùng khi vượt cap hoặc vượt dung lượng cache.
-        Cảnh báo: mất bằng chứng cục bộ chưa gửi được server (chỉ khi cấu hình bật / áp lực đĩa).
+        Xóa **một** bản ghi pending cũ nhất (FIFO theo `id`) + ảnh — chỉ gọi khi `PERSISTENCE_EVICT_PENDING_ON_PRESSURE=1`.
+        **Phá hủy dữ liệu:** mất bằng chứng cục bộ chưa ACK từ server; không dùng trong cấu hình mặc định US_21.
         """
         with self._lock:
             conn = self._connect()
@@ -319,20 +324,44 @@ class PersistenceManager:
 
         total = self._cache_dir_total_bytes()
         if total > self._max_cache_bytes:
-            logger.warning(
-                "[US_21] Dung lượng cache (~%s MB) vẫn vượt %s MB sau orphan prune — thử evict pending FIFO.",
-                round(total / (1024 * 1024), 1),
-                round(self._max_cache_bytes / (1024 * 1024), 1),
-            )
+            if self._evict_pending_on_pressure:
+                logger.warning(
+                    "[US_21] Dung lượng cache (~%s MB) vẫn vượt %s MB sau orphan prune — có thể evict pending FIFO (đã bật PERSISTENCE_EVICT_PENDING_ON_PRESSURE).",
+                    round(total / (1024 * 1024), 1),
+                    round(self._max_cache_bytes / (1024 * 1024), 1),
+                )
+            else:
+                logger.warning(
+                    "[US_21] Dung lượng cache (~%s MB) vẫn vượt %s MB sau orphan prune — không evict pending (mặc định). Tăng ổ / giảm JPEG / hoặc PERSISTENCE_EVICT_PENDING_ON_PRESSURE=1 (rủi ro mất bản ghi chưa ACK).",
+                    round(total / (1024 * 1024), 1),
+                    round(self._max_cache_bytes / (1024 * 1024), 1),
+                )
         self._enforce_storage_limits_post_prune()
 
     def _enforce_storage_limits_post_prune(self) -> None:
-        """Cap số pending (tuỳ cấu hình); nếu cache vẫn > ngưỡng thì evict FIFO cho tới khi đủ chỗ hoặc hết hàng."""
+        """
+        Cap số pending (tuỳ cấu hình) và/hoặc giảm cache — chỉ **evict bản pending chưa ACK** khi
+        `PERSISTENCE_EVICT_PENDING_ON_PRESSURE=1` (mặc định tắt, khớp US_21).
+        """
         cap = self._max_pending_records
-        if cap > 0:
-            while self.pending_count() > cap:
-                if not self.evict_oldest_pending(reason=f"PERSISTENCE_MAX_PENDING_RECORDS={cap}"):
-                    break
+        if cap > 0 and self.pending_count() > cap:
+            if self._evict_pending_on_pressure:
+                while self.pending_count() > cap:
+                    if not self.evict_oldest_pending(reason=f"PERSISTENCE_MAX_PENDING_RECORDS={cap}"):
+                        break
+            else:
+                logger.warning(
+                    "[US_21] pending=%s vượt PERSISTENCE_MAX_PENDING_RECORDS=%s — không tự evict. Kiểm tra mạng hoặc bật PERSISTENCE_EVICT_PENDING_ON_PRESSURE=1 (mất bản ghi chưa gửi).",
+                    self.pending_count(),
+                    cap,
+                )
+
+        if not self._evict_pending_on_pressure:
+            if self._cache_dir_total_bytes() > self._max_cache_bytes:
+                logger.warning(
+                    "[US_21] Cache > PERSISTENCE_MAX_CACHE_BYTES nhưng không evict pending (mặc định an toàn).",
+                )
+            return
 
         max_evictions = 50_000
         n = 0

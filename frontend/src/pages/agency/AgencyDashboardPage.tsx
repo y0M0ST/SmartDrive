@@ -21,7 +21,11 @@ import {
 import { adminApi } from "@/services/adminApi";
 import { reportsApi, unwrapAgencyDashboard } from "@/services/reportsApi";
 import type { AgencyDashboardPayload } from "@/types/agencyReports";
-import { vnCurrentFullMonthRangeYmd } from "@/lib/vnDateRange";
+import {
+  vnCurrentFullMonthRangeYmd,
+  vnCurrentQuarterRangeYmd,
+  vnRolling7DaysRangeYmd,
+} from "@/lib/vnDateRange";
 import { cn } from "@/lib/utils";
 
 const ChartsLazy = lazy(async () => {
@@ -101,10 +105,12 @@ export default function AgencyDashboardPage() {
   const [draftFrom, setDraftFrom] = useState(defaultRange.from);
   const [draftTo, setDraftTo] = useState(defaultRange.to);
   const [draftDriverId, setDraftDriverId] = useState("");
+  const [draftViolationType, setDraftViolationType] = useState<"" | "DROWSY" | "DISTRACTED">("");
 
   const [appliedFrom, setAppliedFrom] = useState(defaultRange.from);
   const [appliedTo, setAppliedTo] = useState(defaultRange.to);
   const [appliedDriverId, setAppliedDriverId] = useState("");
+  const [appliedViolationType, setAppliedViolationType] = useState<"" | "DROWSY" | "DISTRACTED">("");
 
   const [dashboard, setDashboard] = useState<AgencyDashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -121,6 +127,7 @@ export default function AgencyDashboardPage() {
         startDate: appliedFrom,
         endDate: appliedTo,
         ...(appliedDriverId ? { driverId: appliedDriverId } : {}),
+        ...(appliedViolationType ? { violationType: appliedViolationType } : {}),
       });
       const parsed = unwrapAgencyDashboard(res);
       if (!parsed) {
@@ -142,7 +149,7 @@ export default function AgencyDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [appliedFrom, appliedTo, appliedDriverId]);
+  }, [appliedFrom, appliedTo, appliedDriverId, appliedViolationType]);
 
   useEffect(() => {
     void fetchDashboard();
@@ -187,7 +194,8 @@ export default function AgencyDashboardPage() {
     setAppliedFrom(draftFrom);
     setAppliedTo(draftTo);
     setAppliedDriverId(draftDriverId);
-  }, [draftFrom, draftTo, draftDriverId]);
+    setAppliedViolationType(draftViolationType);
+  }, [draftFrom, draftTo, draftDriverId, draftViolationType]);
 
   const summary = dashboard?.summary;
 
@@ -219,6 +227,7 @@ export default function AgencyDashboardPage() {
         startDate: appliedFrom,
         endDate: appliedTo,
         ...(appliedDriverId ? { driverId: appliedDriverId } : {}),
+        ...(appliedViolationType ? { violationType: appliedViolationType } : {}),
       });
       const blob = res.data as Blob;
       const ct = String(res.headers["content-type"] ?? "").toLowerCase();
@@ -250,14 +259,14 @@ export default function AgencyDashboardPage() {
     } finally {
       setExporting(false);
     }
-  }, [canExport, appliedFrom, appliedTo, appliedDriverId]);
+  }, [canExport, appliedFrom, appliedTo, appliedDriverId, appliedViolationType]);
 
   return (
     <div className="mx-auto w-full max-w-[1320px] min-w-0 space-y-6 text-foreground">
       <div className="min-w-0 space-y-1">
         <h1 className="text-2xl font-black tracking-tight min-[1024px]:text-3xl">Thống kê và xuất báo cáo</h1>
         <p className="text-sm text-muted-foreground">
-          Dữ liệu theo khoảng ngày (VN), lọc theo tài xế nếu cần. Xuất Excel dùng cùng bộ tham số với thống kê.
+          Dữ liệu theo khoảng ngày (VN), lọc theo tài xế và loại vi phạm nếu cần. Xuất Excel dùng cùng bộ tham số với thống kê.
         </p>
       </div>
 
@@ -266,6 +275,47 @@ export default function AgencyDashboardPage() {
           <div className="min-w-0 space-y-2 sm:col-span-2 lg:col-span-1">
             <Label className="text-xs">Khoảng thời gian</Label>
             <ViolationDateRangePicker from={draftFrom} to={draftTo} onRangeChange={onRangeDraftChange} />
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  const r = vnRolling7DaysRangeYmd();
+                  setDraftFrom(r.from);
+                  setDraftTo(r.to);
+                }}
+              >
+                7 ngày
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  const r = vnCurrentFullMonthRangeYmd();
+                  setDraftFrom(r.from);
+                  setDraftTo(r.to);
+                }}
+              >
+                Tháng này
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  const r = vnCurrentQuarterRangeYmd();
+                  setDraftFrom(r.from);
+                  setDraftTo(r.to);
+                }}
+              >
+                Quý này
+              </Button>
+            </div>
           </div>
           <div className="min-w-0 space-y-2">
             <Label className="text-xs">Tài xế</Label>
@@ -284,6 +334,24 @@ export default function AgencyDashboardPage() {
                     {d.full_name}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0 space-y-2">
+            <Label className="text-xs">Loại vi phạm AI</Label>
+            <Select
+              value={draftViolationType || "__all__"}
+              onValueChange={(v) =>
+                setDraftViolationType(v === "__all__" ? "" : (v as "DROWSY" | "DISTRACTED"))
+              }
+            >
+              <SelectTrigger className="h-10 w-full min-w-0">
+                <SelectValue placeholder="Tất cả" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tất cả</SelectItem>
+                <SelectItem value="DROWSY">Buồn ngủ</SelectItem>
+                <SelectItem value="DISTRACTED">Mất tập trung</SelectItem>
               </SelectContent>
             </Select>
           </div>
