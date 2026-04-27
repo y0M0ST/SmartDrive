@@ -11,7 +11,8 @@
     "migrate": "ts-node src/scripts/run-migration.ts",
     "seed": "ts-node src/scripts/run-seeder.ts",
     "cleanup:release": "ts-node src/scripts/cleanup-release.ts",
-    "cleanup:reset-non-rbac": "ts-node src/scripts/cleanup-reset-non-rbac.ts"
+    "cleanup:reset-non-rbac": "ts-node src/scripts/cleanup-reset-non-rbac.ts",
+    "cleanup:reset-full": "ts-node src/scripts/cleanup-reset-full.ts"
   },
   "keywords": [],
   "author": "",

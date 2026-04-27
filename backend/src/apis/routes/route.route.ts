@@ -12,13 +12,13 @@ import {
 
 const router = Router();
 
-router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN', 'COORDINATOR']));
+router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN']));
 
 /**
  * @swagger
  * tags:
  *   - name: Routes
- *     description: Danh mục tuyến đường (SUPER_ADMIN, AGENCY_ADMIN, COORDINATOR)
+ *     description: Danh mục tuyến đường (SUPER_ADMIN, AGENCY_ADMIN)
  */
 
 /**

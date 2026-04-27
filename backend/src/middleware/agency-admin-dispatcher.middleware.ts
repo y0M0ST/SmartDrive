@@ -2,10 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../common/errors/app-error';
 import type { JwtPayload } from '../utils/jwtHelper';
 
-const ROLES = ['AGENCY_ADMIN', 'DISPATCHER'] as const;
+const ROLES = ['AGENCY_ADMIN'] as const;
 
 /**
- * US_10 — Chỉ nhân sự nhà xe (admin / điều phối) có agency_id.
+ * US_10 — Chỉ AGENCY_ADMIN có agency_id.
  * SUPER_ADMIN không dùng các API inbox theo agency.
  */
 export const requireAgencyAdminOrDispatcher = (req: Request, res: Response, next: NextFunction) => {

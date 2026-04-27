@@ -15,15 +15,13 @@ import {
 } from "@/lib/adminAccess";
 import { AgencySocketProvider } from "@/contexts/AgencySocketContext";
 import { AgencyViolationBell } from "@/components/agency/AgencyViolationBell";
+import { LogoutConfirmControl } from "@/components/auth/LogoutConfirmControl";
 
 /** Menu vận hành nhà xe — Super Admin không thấy các mục này. */
 const AGENCY_MENU_ITEMS = [
   { icon: Icons.LayoutDashboard, label: "Dashboard nhà xe", path: "/admin/dashboard" },
-  {
-    icon: Icons.Users,
-    label: "Tài xế & tài khoản",
-    path: "/admin/drivers",
-  },
+  { icon: Icons.Users, label: "Danh sách tài xế", path: "/admin/drivers" },
+  { icon: Icons.UserCog, label: "Quản lý tài khoản", path: "/admin/accounts" },
   { icon: Icons.Clipboard, label: "Quản lí tuyến đường", path: "/admin/routes" },
   { icon: Icons.Calendar, label: "Quản lí chuyến đi", path: "/admin/trips" },
   { icon: Icons.MapPin, label: "Giám sát hành trình", path: "/admin/fleet" },
@@ -36,6 +34,7 @@ const AGENCY_MENU_ITEMS = [
 /** Trung tâm Super Admin — tách khỏi UI đại lý. */
 const SUPER_MENU_ITEMS = [
   { icon: Icons.LayoutDashboard, label: "Tổng quan hệ thống", path: "/admin/super/overview" },
+  { icon: Icons.UserCog, label: "Quản lý tài khoản", path: "/admin/accounts" },
   { icon: Icons.Building2, label: "Quản lý đại lý", path: "/admin/super/agencies" },
   { icon: Icons.Package, label: "Gói cước (demo)", path: "/admin/super/plans" },
   { icon: Icons.ScrollText, label: "Nhật ký hệ thống", path: "/admin/super/logs" },
@@ -73,7 +72,9 @@ export default function MainLayout() {
 
         <nav className="flex-1 space-y-1 overflow-y-auto pr-2 custom-scrollbar">
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive =
+              location.pathname === item.path ||
+              (item.path === "/admin/drivers" && location.pathname.startsWith("/admin/drivers"));
             return (
               <Link
                 key={item.path}
@@ -175,17 +176,10 @@ export default function MainLayout() {
                   </DropdownMenuItem>
                 </Link>
                 <div className="mx-2 my-1 h-px bg-border" />
-                <DropdownMenuItem
-                  onClick={() => {
-                    localStorage.clear();
-                    window.dispatchEvent(new Event("smartdrive:auth"));
-                    window.location.replace("/login");
-                  }}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
-                >
+                <LogoutConfirmControl variant="dropdown-item">
                   <Icons.LogOut size={18} />
                   <span className="text-sm font-bold">Đăng xuất</span>
-                </DropdownMenuItem>
+                </LogoutConfirmControl>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

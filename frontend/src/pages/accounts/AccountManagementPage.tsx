@@ -85,12 +85,8 @@ function roleBadgeLabel(roleName?: string): string {
       return "Chủ hệ thống";
     case "AGENCY_ADMIN":
       return "Quản lý nhà xe";
-    case "DISPATCHER":
-      return "Điều phối";
     case "DRIVER":
       return "Tài xế";
-    case "VIEWER":
-      return "Người xem";
     default:
       return roleName || "—";
   }

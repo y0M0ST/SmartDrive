@@ -6,6 +6,7 @@ import { Role } from '../../entities/role.entity';
 
 const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     SUPER_ADMIN: ['*'],
+    /** Toàn quyền vận hành nhà xe (gộp quyền điều phối / viewer cũ vào một role). */
     AGENCY_ADMIN: [
         'users.read',
         'users.create',
@@ -38,37 +39,10 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
         'audit.read',
         'reports.read',
     ],
-    DISPATCHER: [
-        'drivers.read',
-        'vehicles.read',
-        'routes.read',
-        'trips.read',
-        'trips.create',
-        'trips.update',
-        'trips.cancel',
-        'trips.start',
-        'trips.complete',
-        'violations.read',
-        'violations.acknowledge',
-        'notifications.read',
-        'notifications.mark_read',
-        'reports.read',
-    ],
     DRIVER: [
         'trips.read',
         'notifications.read',
         'notifications.mark_read',
-    ],
-    VIEWER: [
-        'users.read',
-        'drivers.read',
-        'vehicles.read',
-        'routes.read',
-        'trips.read',
-        'violations.read',
-        'notifications.read',
-        'reports.read',
-        'audit.read',
     ],
 };
 
@@ -84,6 +58,7 @@ export async function seedRolePermissions(): Promise<void> {
     for (const role of roles) {
         const configuredCodes = ROLE_PERMISSION_MAP[role.name];
         if (!configuredCodes) {
+            await rolePermissionRepo.delete({ role_id: role.id });
             continue;
         }
 

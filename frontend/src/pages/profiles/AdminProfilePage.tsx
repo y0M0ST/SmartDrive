@@ -12,6 +12,7 @@ import {
   getProfileApiErrorMessage,
   type MeUser,
 } from "@/services/profileApi";
+import { clearClientAuth } from "@/lib/performLogout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,12 +34,7 @@ const nameSchema = z.object({
 const passwordSchema = z
   .object({
     oldPassword: z.string().min(1, "Vui lòng nhập mật khẩu cũ"),
-    newPassword: z
-      .string()
-      .min(6, "Mật khẩu mới phải từ 6 ký tự")
-      .regex(/[A-Z]/, "Cần ít nhất 1 chữ hoa")
-      .regex(/[0-9]/, "Cần ít nhất 1 chữ số")
-      .regex(/[@$!%*?&]/, "Cần ít nhất 1 ký tự đặc biệt"),
+    newPassword: z.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự"),
     confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu mới"),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
@@ -222,11 +218,7 @@ export default function AdminProfilePage() {
       formPassword.reset();
       setIsPassSuccessOpen(true);
     } catch (error: unknown) {
-      const ax = error instanceof AxiosError;
-      const message = ax && error.response?.status === 401
-        ? "Mật khẩu hiện tại không chính xác."
-        : getProfileApiErrorMessage(error);
-      toast.error(message);
+      toast.error(getProfileApiErrorMessage(error));
     }
   };
 
@@ -564,17 +556,17 @@ export default function AdminProfilePage() {
               <Icons.Check className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground">Cập nhật thành công</h2>
+              <h2 className="text-xl font-bold text-foreground">Đổi mật khẩu thành công</h2>
               <p className="text-sm text-muted-foreground">
-                Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại để tiếp tục.
+                Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.
               </p>
             </div>
             <Button
               className="w-full"
               onClick={() => {
                 setIsPassSuccessOpen(false);
-                localStorage.clear();
-                navigate("/login");
+                clearClientAuth();
+                navigate("/login", { replace: true });
               }}
             >
               Đăng nhập lại

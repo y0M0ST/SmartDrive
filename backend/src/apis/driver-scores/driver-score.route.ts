@@ -13,7 +13,7 @@ router.use(authMiddleware, requireAgencyAdminOrDispatcher);
  * @swagger
  * tags:
  *   - name: Driver scores
- *     description: US_13 — Điểm an toàn & BXH (AGENCY_ADMIN, DISPATCHER; Super Admin 403)
+ *     description: US_13 — Điểm an toàn & BXH (AGENCY_ADMIN; Super Admin 403)
  */
 
 /**

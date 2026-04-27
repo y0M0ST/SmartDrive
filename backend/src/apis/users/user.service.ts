@@ -20,9 +20,7 @@ type ActorContext = {
 const ROLES = {
     SUPER_ADMIN: 'SUPER_ADMIN',
     AGENCY_ADMIN: 'AGENCY_ADMIN',
-    DISPATCHER: 'DISPATCHER',
     DRIVER: 'DRIVER',
-    VIEWER: 'VIEWER',
 } as const;
 
 /** Agency Admin chỉ được tạo tài xế (role thấp hơn, vận hành thực tế). */

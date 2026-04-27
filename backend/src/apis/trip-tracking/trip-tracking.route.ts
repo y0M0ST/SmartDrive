@@ -18,7 +18,7 @@ const router = Router();
  *   get:
  *     summary: Danh sách chuyến IN_PROGRESS và điểm GPS mới nhất (bản đồ giám sát)
  *     description: |
- *       US_09 — Chỉ **AGENCY_ADMIN** và **DISPATCHER** có `agency_id`. Trả về các chuyến đang chạy của nhà xe
+ *       US_09 — Chỉ **AGENCY_ADMIN** có `agency_id`. Trả về các chuyến đang chạy của nhà xe
  *       kèm tọa độ/speed/heading mới nhất từ `gps_logs` (nếu có).
  *     tags: [Trip tracking]
  *     security:

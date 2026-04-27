@@ -15,12 +15,11 @@ type ActorContext = {
 const ROLES = {
     SUPER_ADMIN: 'SUPER_ADMIN',
     AGENCY_ADMIN: 'AGENCY_ADMIN',
-    DISPATCHER: 'DISPATCHER',
     DRIVER: 'DRIVER',
 } as const;
 
 function ensureProfileManager(actor: ActorContext): void {
-    if (![ROLES.SUPER_ADMIN, ROLES.AGENCY_ADMIN, ROLES.DISPATCHER].includes(actor.role as any)) {
+    if (![ROLES.SUPER_ADMIN, ROLES.AGENCY_ADMIN].includes(actor.role as any)) {
         throw new AppError('Ban khong co quyen quan ly ho so tai xe.', 403);
     }
 }

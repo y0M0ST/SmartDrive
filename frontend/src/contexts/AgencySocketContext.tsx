@@ -66,7 +66,7 @@ export function AgencySocketProvider({ children }: { children: ReactNode }) {
 
   const role = readStoredUserRole();
   const agencySocketEnabled =
-    !!authToken && !isSuperAdmin(role) && (role === "AGENCY_ADMIN" || role === "DISPATCHER");
+    !!authToken && !isSuperAdmin(role) && role === "AGENCY_ADMIN";
 
   const refreshUnread = useCallback(async () => {
     if (!agencySocketEnabled) {

@@ -54,19 +54,6 @@ function buildUsersSeed(): UserSeedInput[] {
         });
     }
 
-    for (let i = 1; i <= 15; i += 1) {
-        const suffix = String(i).padStart(2, '0');
-        users.push({
-            username: `dispatcher${suffix}`,
-            full_name: `Dispatcher ${suffix}`,
-            email: buildSeedEmail(`agency.dispatcher${suffix}`),
-            phone: `09882${String(i).padStart(5, '0')}`,
-            roleName: 'DISPATCHER',
-            agencyCode: `AGENCY_${String(((i - 1) % 10) + 1).padStart(2, '0')}`,
-            status: i === 15 ? UserStatus.BLOCKED : UserStatus.ACTIVE,
-        });
-    }
-
     for (let i = 1; i <= 20; i += 1) {
         const suffix = String(i).padStart(2, '0');
         users.push({
@@ -77,19 +64,6 @@ function buildUsersSeed(): UserSeedInput[] {
             roleName: 'DRIVER',
             agencyCode: `AGENCY_${String(((i - 1) % 10) + 1).padStart(2, '0')}`,
             status: i <= 2 ? UserStatus.INACTIVE : UserStatus.ACTIVE,
-        });
-    }
-
-    for (let i = 1; i <= 24; i += 1) {
-        const suffix = String(i).padStart(2, '0');
-        users.push({
-            username: `viewer${suffix}`,
-            full_name: `Viewer ${suffix}`,
-            email: buildSeedEmail(`agency.viewer${suffix}`),
-            phone: `09884${String(i).padStart(5, '0')}`,
-            roleName: 'VIEWER',
-            agencyCode: `AGENCY_${String(((i - 1) % 10) + 1).padStart(2, '0')}`,
-            status: i === 24 ? UserStatus.BLOCKED : UserStatus.ACTIVE,
         });
     }
 
