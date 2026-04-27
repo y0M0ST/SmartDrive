@@ -13,7 +13,7 @@ router.use(authMiddleware, requireAgencyAdminOrDispatcher);
  * @swagger
  * tags:
  *   - name: Violations inbox
- *     description: US_10 — Hộp thư vi phạm AI (AGENCY_ADMIN, DISPATCHER; Super Admin không dùng)
+ *     description: US_10 — Hộp thư vi phạm AI (AGENCY_ADMIN; Super Admin không dùng)
  */
 
 /**

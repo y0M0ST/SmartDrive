@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN', 'COORDINATOR']));
+router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN']));
 
 /**
  * @swagger

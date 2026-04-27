@@ -18,9 +18,11 @@ import {
 import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./pages/auth/LoginPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import RouteListPage from "./pages/routes/RouteListPage";
 import AdminProfilePage from "./pages/profiles/AdminProfilePage";
 import DriverManagement from "./pages/DriverManagement";
+import AccountManagementPage from "./pages/accounts/AccountManagementPage";
 import VehicleManagement from "./pages/VehicleManagement";
 import AgencyDashboardPage from "./pages/agency/AgencyDashboardPage";
 import AgencyPlaceholderPage from "./pages/agency/AgencyPlaceholderPage";
@@ -38,6 +40,7 @@ import DriverNotificationsPage from "./pages/portal/driver/DriverNotificationsPa
 import DriverMePage from "./pages/portal/driver/DriverMePage";
 import DriverViolationsPage from "./pages/portal/driver/DriverViolationsPage";
 import DriverStatisticsPage from "./pages/portal/driver/DriverStatisticsPage";
+import { SessionIdleWatcher } from "./components/auth/SessionIdleWatcher";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem("access_token");
@@ -160,11 +163,13 @@ function App() {
       <Toaster position="top-right" richColors duration={10000} closeButton />
       <BrowserRouter>
         <AuthSynchronizer>
+          <SessionIdleWatcher />
           <Routes>
             <Route path="/" element={<AppRootRedirect />} />
 
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             <Route
               path="/admin"
@@ -178,6 +183,7 @@ function App() {
             >
               <Route index element={<AdminHomeRedirect />} />
               <Route path="profile" element={<AdminProfilePage />} />
+              <Route path="accounts" element={<AccountManagementPage />} />
 
               <Route path="super" element={<SuperAdminShell />}>
                 <Route index element={<Navigate to="overview" replace />} />
@@ -192,7 +198,6 @@ function App() {
                 <Route path="routes" element={<RouteListPage />} />
                 <Route path="drivers" element={<DriverManagement />} />
                 <Route path="vehicles" element={<VehicleManagement />} />
-                <Route path="accounts" element={<Navigate to="/admin/drivers" replace />} />
                 <Route path="trips" element={<TripListPage />} />
                 <Route path="fleet" element={<AgencyFleetTrackingPage />} />
                 <Route path="violations" element={<ViolationListPage />} />

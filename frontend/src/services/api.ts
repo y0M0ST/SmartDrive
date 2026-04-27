@@ -1,4 +1,6 @@
 import axios, { AxiosHeaders } from "axios";
+import { toast } from "sonner";
+import { clearClientAuth, SESSION_EXPIRED_MESSAGE } from "@/lib/performLogout";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
@@ -37,13 +39,13 @@ api.interceptors.response.use(
   (error) => {
     // Kiểm tra lỗi 401 (Hết hạn hoặc sai token)
     if (error.response && error.response.status === 401) {
-      // Chỉ redirect nếu không phải đang ở trang login (tránh vòng lặp vô tận)
-      if (!window.location.pathname.includes("/login")) {
-        console.error("Phiên đăng nhập hết hạn.");
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user_info"); // Xóa thêm thông tin user nếu có lưu
-        window.dispatchEvent(new Event("smartdrive:auth"));
-        window.location.href = "/login";
+      const path = window.location.pathname;
+      const onAuthForm =
+        path.includes("/login") || path.includes("/forgot-password") || path.includes("/reset-password");
+      if (!onAuthForm) {
+        toast.error(SESSION_EXPIRED_MESSAGE, { duration: 10_000 });
+        clearClientAuth();
+        window.location.replace("/login");
       }
     }
     return Promise.reject(error);

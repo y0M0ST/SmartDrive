@@ -1,5 +1,8 @@
-/** Khớp các route agency trên BE (ví dụ US_13: `requireAgencyAdminOrDispatcher`). */
-const ADMIN_DASHBOARD_ROLES = new Set(["SUPER_ADMIN", "AGENCY_ADMIN", "DISPATCHER"]);
+/**
+ * Web Admin / Agency Dashboard (US_01): SA, quản trị & vận hành nhà xe, viewer chỉ đọc.
+ * DRIVER dùng Cổng tài xế — không nằm trong tập này.
+ */
+const ADMIN_DASHBOARD_ROLES = new Set(["SUPER_ADMIN", "AGENCY_ADMIN"]);
 
 export function canAccessAdminDashboard(role: string | undefined | null): boolean {
   return !!role && ADMIN_DASHBOARD_ROLES.has(role);

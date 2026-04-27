@@ -2,10 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../../common/errors/app-error';
 import type { JwtPayload } from '../../utils/jwtHelper';
 
-const ALLOWED_ROLES = ['AGENCY_ADMIN', 'DISPATCHER'] as const;
+const ALLOWED_ROLES = ['AGENCY_ADMIN'] as const;
 
 /**
- * US_09 — Chỉ AGENCY_ADMIN / DISPATCHER có agency_id mới được xem tracking.
+ * US_09 — Chỉ AGENCY_ADMIN (có agency_id) được xem tracking.
  * SUPER_ADMIN tuyệt đối không dùng API này (tránh lộ trải nghiệm multi-tenant sai kỳ vọng).
  */
 export const requireAgencyTrackingAccess = (req: Request, res: Response, next: NextFunction) => {
