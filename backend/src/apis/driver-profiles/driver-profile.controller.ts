@@ -29,10 +29,7 @@ export const createProfile = catchAsync(async (req: Request, res: Response) => {
     );
 
     res.status(201).json(
-        ServiceResponse.success(
-            'Da tao ho so tai xe va dong bo du lieu nhan dien',
-            result,
-        ),
+        ServiceResponse.success('Đã cập nhật hồ sơ và đồng bộ dữ liệu nhận diện', result),
     );
 });
 
@@ -46,10 +43,7 @@ export const updateProfile = catchAsync(async (req: Request, res: Response) => {
     );
 
     res.status(200).json(
-        ServiceResponse.success(
-            'Da cap nhat ho so tai xe va dong bo du lieu nhan dien',
-            result,
-        ),
+        ServiceResponse.success('Đã cập nhật hồ sơ và đồng bộ dữ liệu nhận diện', result),
     );
 });
 

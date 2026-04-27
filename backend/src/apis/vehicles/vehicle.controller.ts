@@ -39,5 +39,5 @@ export const changeStatus = catchAsync(async (req: Request, res: Response) => {
 export const deleteVehicle = catchAsync(async (req: Request, res: Response) => {
     const agencyId = getAgencyIdFromRequest(req);
     await vehicleService.deleteVehicle(agencyId, req.params.id as string);
-    res.status(200).json(ServiceResponse.success('Đã xóa phương tiện khỏi hệ thống'));
+    res.status(200).json(ServiceResponse.success('Đã ẩn phương tiện khỏi danh sách (xóa mềm).'));
 });

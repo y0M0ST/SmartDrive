@@ -149,7 +149,8 @@ export const createProfile = async (
         await profileRepo.delete({ id: profile.id });
         throw error;
     }
-    console.log(`[AI Pipeline] enqueue extract face encoding for profile_id=${profile.id}`);
+    // Vector `face_encoding` được đồng bộ khi tài xế đăng ký mẫu khuôn mặt (API driver-portal) hoặc job AI riêng — không tự sinh từ ảnh tại bước này.
+    console.log(`[driver-profile] profile_id=${profile.id} images saved; face_encoding sync is separate pipeline`);
 
     return { ...profile, images };
 };
@@ -203,7 +204,7 @@ export const updateProfile = async (
         throw new AppError('Ho so tai xe chi duoc luu toi da 3 anh.', 400);
     }
 
-    console.log(`[AI Pipeline] enqueue refresh face encoding for profile_id=${profile.id}`);
+    console.log(`[driver-profile] profile_id=${profile.id} refresh; face_encoding sync is separate pipeline`);
     return { ...profile, images };
 };
 

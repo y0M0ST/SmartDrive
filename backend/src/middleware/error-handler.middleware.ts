@@ -49,7 +49,7 @@ function normalizeError(err: unknown): AppError {
 
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-            return new AppError('Kich thuoc anh toi da la 5MB.', 400);
+            return new AppError('Mỗi ảnh tối đa 5MB (.jpg hoặc .png).', 400);
         }
         return new AppError(err.message || 'Loi upload file.', 400);
     }
