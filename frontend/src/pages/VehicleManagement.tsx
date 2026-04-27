@@ -89,7 +89,7 @@ export default function VehicleManagement() {
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
@@ -161,7 +161,7 @@ export default function VehicleManagement() {
     if (!vehicleToDelete) return;
     try {
       await api.delete(`/vehicles/${vehicleToDelete.id}`);
-      toast.success("Đã xóa phương tiện.");
+      toast.success("Đã ẩn xe khỏi danh sách (xóa mềm, dữ liệu lịch sử được giữ).");
       await fetchVehicles();
       setIsConfirmOpen(false);
       setVehicleToDelete(null);
@@ -273,7 +273,7 @@ export default function VehicleManagement() {
                   <th className="px-6 py-4">Loại xe</th>
                   <th className="px-6 py-4 text-center">Số chỗ</th>
                   <th className="px-6 py-4 text-center">Trạng thái</th>
-                  <th className="px-6 py-4">Mã camera</th>
+                  <th className="px-6 py-4">Mã Camera AI</th>
                   <th className="px-6 py-4 text-center">Hành động</th>
                 </tr>
               </thead>
@@ -339,8 +339,13 @@ export default function VehicleManagement() {
                         <button
                           type="button"
                           onClick={() => handleDeleteClick(v)}
-                          className="text-muted-foreground transition-transform hover:scale-110 hover:text-red-500"
-                          title="Xóa"
+                          disabled={v.status === "IN_SERVICE"}
+                          className="text-muted-foreground transition-transform hover:scale-110 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:text-muted-foreground"
+                          title={
+                            v.status === "IN_SERVICE"
+                              ? "Không thể xóa xe đang ở trạng thái Đang chạy"
+                              : "Xóa mềm khỏi danh sách"
+                          }
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path

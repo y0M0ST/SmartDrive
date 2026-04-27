@@ -8,6 +8,11 @@ const LICENSE_CLASSES = ["B", "C", "D", "E", "F"] as const;
 const MAX_IMAGES = 3;
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
+/** Khớp BE: cho phép hết hạn vào hôm nay; chỉ cấm ngày trước hôm nay. */
+function startOfLocalDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
 type StagedShot = { file: File; preview: string };
 
 interface FloatingInputProps {
@@ -300,8 +305,9 @@ const DriverModal = ({ isOpen, onClose, mode, initialData, onSuccess }: DriverMo
         newErrors.expiryDate = "Ngày hết hạn không được bỏ trống";
       } else {
         const selectedDate = new Date(formData.expiryDate);
-        selectedDate.setHours(0, 0, 0, 0);
-        if (selectedDate <= today) newErrors.expiryDate = "Ngày hết hạn phải nằm trong tương lai";
+        if (startOfLocalDay(selectedDate) < startOfLocalDay(today)) {
+          newErrors.expiryDate = "Ngày hết hạn không được là ngày trong quá khứ";
+        }
       }
     }
 
@@ -343,13 +349,13 @@ const DriverModal = ({ isOpen, onClose, mode, initialData, onSuccess }: DriverMo
           const fd = new FormData();
           appendProfileFields(fd);
           await driverApi.updateProfile(initialData.id, fd);
-          toast.success("Đã cập nhật tài khoản và hồ sơ (đồng bộ nhận diện).");
+          toast.success("Đã cập nhật hồ sơ và đồng bộ dữ liệu nhận diện");
         } else if (hasProfile === false) {
           const fd = new FormData();
           fd.append("user_id", initialData.id);
           appendProfileFields(fd);
           await driverApi.createProfile(fd);
-          toast.success("Đã cập nhật tài khoản và tạo hồ sơ tài xế lần đầu.");
+          toast.success("Đã cập nhật hồ sơ và đồng bộ dữ liệu nhận diện");
         }
 
         onClose();

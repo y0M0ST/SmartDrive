@@ -19,7 +19,7 @@ export const uploadConfig = multer({
         if (extname && mimetype) {
             return cb(null, true);
         } else {
-            cb(new AppError('Chi chap nhan dinh dang anh .jpg hoac .png!', 400));
+            cb(new AppError('Chỉ chấp nhận ảnh định dạng .jpg hoặc .png.', 400));
         }
     },
 });

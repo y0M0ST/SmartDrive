@@ -39,5 +39,5 @@ export const changeStatus = catchAsync(async (req: Request, res: Response) => {
 export const deleteRoute = catchAsync(async (req: Request, res: Response) => {
     const agencyId = getAgencyIdFromRequest(req);
     await routeService.deleteRoute(agencyId, req.params.id as string);
-    res.status(200).json(ServiceResponse.success('Đã xóa tuyến đường khỏi hệ thống'));
+    res.status(200).json(ServiceResponse.success('Đã ẩn tuyến đường khỏi danh sách (xóa mềm).'));
 });
