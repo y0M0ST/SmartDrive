@@ -263,6 +263,7 @@ export default function SuperAdminAgenciesPage() {
             variant="outline"
             className="h-11 rounded-xl border-border font-bold"
             onClick={openAccountPicker}
+            disabled={saving}
           >
             <Icons.UserPlus className="mr-2 size-5" />
             Tạo tài khoản cho đại lý
@@ -356,6 +357,7 @@ export default function SuperAdminAgenciesPage() {
                             size="sm"
                             className="rounded-lg bg-blue-600 font-bold hover:bg-blue-700"
                             onClick={() => openAccountForAgency(a)}
+                            disabled={saving}
                           >
                             Tạo Admin
                           </Button>

@@ -2,8 +2,8 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string;
-const ACCESS_TOKEN_EXPIRES_IN = (process.env.JWT_ACCESS_EXPIRES_IN || '7d').trim();
-const REFRESH_TOKEN_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '7d').trim();
+const ACCESS_TOKEN_EXPIRES_IN = ((process.env.JWT_ACCESS_EXPIRES_IN || '7d').trim() as jwt.SignOptions['expiresIn']);
+const REFRESH_TOKEN_EXPIRES_IN = ((process.env.JWT_REFRESH_EXPIRES_IN || '7d').trim() as jwt.SignOptions['expiresIn']);
 
 export type JwtPayload = {
     id: string;

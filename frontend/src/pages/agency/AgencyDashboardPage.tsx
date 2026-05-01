@@ -80,21 +80,21 @@ function StatCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-gray-200 bg-white p-4 text-gray-800 shadow-md",
-        "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100",
+        "rounded-2xl border border-gray-200 bg-white p-4 text-slate-800 shadow-md",
+        "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:shadow-none",
         className,
       )}
     >
-      <p className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</p>
       <p
         className={cn(
-          "mt-2 break-words text-2xl font-black tabular-nums tracking-tight text-foreground",
+          "mt-2 break-words text-2xl font-black tabular-nums tracking-tight text-slate-800 dark:text-slate-100",
           valueClassName,
         )}
       >
         {value}
       </p>
-      {hint ? <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{hint}</p> : null}
     </div>
   );
 }

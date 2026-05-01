@@ -52,17 +52,19 @@ function statusBadge(status: UserStatus) {
       return {
         label: "Hoạt động",
         className:
-          "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/35 dark:text-emerald-200",
+          "border-green-200 bg-green-50 text-green-600 ring-1 ring-green-200 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400 dark:ring-green-800/60",
       };
     case "BLOCKED":
       return {
         label: "Đã khóa",
-        className: "bg-red-100 text-red-800 dark:bg-red-900/35 dark:text-red-200",
+        className:
+          "border-red-200 bg-red-100 text-red-700 ring-1 ring-red-200 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800/60",
       };
     default:
       return {
         label: "Không hoạt động",
-        className: "bg-muted text-muted-foreground",
+        className:
+          "border-amber-200 bg-amber-50 text-amber-600 ring-1 ring-amber-200 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400 dark:ring-amber-800/60",
       };
   }
 }
@@ -325,7 +327,12 @@ export default function DriverManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge className={`rounded-lg font-bold ${sb.className}`}>{sb.label}</Badge>
+                          <Badge
+                            variant="outline"
+                            className={`h-6 rounded-full px-2.5 text-[12px] font-semibold ${sb.className}`}
+                          >
+                            {sb.label}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-wrap justify-end gap-1">
