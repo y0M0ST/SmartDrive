@@ -170,7 +170,7 @@ export default function LoginPage() {
       >
         <div className="space-y-2">
           <Label htmlFor="email" className="font-semibold text-foreground">
-            Tên đăng nhập (Email)
+            Email
           </Label>
           <Input
             id="email"

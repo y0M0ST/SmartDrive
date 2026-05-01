@@ -11,7 +11,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return next(new AppError('Vui long cung cap token.', 401));
+        return next(new AppError('Vui long cung cap token.', 401, undefined, 'AUTH_TOKEN_MISSING'));
     }
 
     const token = authHeader.split(' ')[1];
@@ -21,7 +21,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         const sessionId = decoded.sid as string | undefined;
 
         if (!sessionId) {
-            return next(new AppError('Phien dang nhap khong hop le.', 401));
+            return next(new AppError('Phien dang nhap khong hop le.', 401, undefined, 'AUTH_SESSION_INVALID'));
         }
 
         const sessionRepository = AppDataSource.getRepository(UserSession);
@@ -36,14 +36,26 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
         if (!activeSession) {
             return next(
-                new AppError('Phien dang nhap da het han hoac da dang xuat.', 401),
+                new AppError(
+                    'Phien dang nhap da het han hoac da dang xuat.',
+                    401,
+                    undefined,
+                    'AUTH_SESSION_EXPIRED_OR_REVOKED',
+                ),
             );
         }
 
         (req as any).user = decoded;
         return next();
     } catch (error) {
-        return next(new AppError('Token khong hop le hoac da het han.', 401));
+        return next(
+            new AppError(
+                'Token khong hop le hoac da het han.',
+                401,
+                undefined,
+                'AUTH_TOKEN_INVALID_OR_EXPIRED',
+            ),
+        );
     }
 };
 

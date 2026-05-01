@@ -160,7 +160,7 @@ function App() {
       disableTransitionOnChange
       storageKey="smartdrive-theme"
     >
-      <Toaster position="top-right" richColors duration={10000} closeButton />
+      <Toaster position="top-right" richColors duration={3000} closeButton />
       <BrowserRouter>
         <AuthSynchronizer>
           <SessionIdleWatcher />

@@ -54,7 +54,7 @@ export async function performLogout(options?: PerformLogoutOptions): Promise<voi
   await revokeRefreshSessionOnServer();
   clearClientAuth();
   if (!manual) {
-    toast.error(SESSION_EXPIRED_MESSAGE, { duration: 10_000 });
+    toast.error(SESSION_EXPIRED_MESSAGE, { duration: 3000 });
   }
   window.location.replace("/login");
 }

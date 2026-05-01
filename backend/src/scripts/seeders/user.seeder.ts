@@ -31,6 +31,7 @@ type UserSeedInput = {
 
 function buildUsersSeed(): UserSeedInput[] {
     const users: UserSeedInput[] = [
+        // SUPER_ADMIN + ACTIVE
         {
             username: 'superadmin',
             full_name: 'Super Admin',
@@ -38,6 +39,24 @@ function buildUsersSeed(): UserSeedInput[] {
             phone: '0988000001',
             roleName: 'SUPER_ADMIN',
             status: UserStatus.ACTIVE,
+        },
+        // SUPER_ADMIN + INACTIVE
+        {
+            username: 'superadmin_inactive',
+            full_name: 'Super Admin Inactive',
+            email: buildSeedEmail('admin.superadmin.inactive'),
+            phone: '0988000002',
+            roleName: 'SUPER_ADMIN',
+            status: UserStatus.INACTIVE,
+        },
+        // SUPER_ADMIN + BLOCKED
+        {
+            username: 'superadmin_blocked',
+            full_name: 'Super Admin Blocked',
+            email: buildSeedEmail('admin.superadmin.blocked'),
+            phone: '0988000003',
+            roleName: 'SUPER_ADMIN',
+            status: UserStatus.BLOCKED,
         },
     ];
 
@@ -53,6 +72,26 @@ function buildUsersSeed(): UserSeedInput[] {
             status: UserStatus.ACTIVE,
         });
     }
+    // AGENCY_ADMIN + INACTIVE
+    users.push({
+        username: 'agencyadmin_inactive',
+        full_name: 'Agency Admin Inactive',
+        email: buildSeedEmail('agency.admin.inactive'),
+        phone: '0988199998',
+        roleName: 'AGENCY_ADMIN',
+        agencyCode: 'AGENCY_01',
+        status: UserStatus.INACTIVE,
+    });
+    // AGENCY_ADMIN + BLOCKED
+    users.push({
+        username: 'agencyadmin_blocked',
+        full_name: 'Agency Admin Blocked',
+        email: buildSeedEmail('agency.admin.blocked'),
+        phone: '0988199999',
+        roleName: 'AGENCY_ADMIN',
+        agencyCode: 'AGENCY_02',
+        status: UserStatus.BLOCKED,
+    });
 
     for (let i = 1; i <= 20; i += 1) {
         const suffix = String(i).padStart(2, '0');
@@ -66,6 +105,16 @@ function buildUsersSeed(): UserSeedInput[] {
             status: i <= 2 ? UserStatus.INACTIVE : UserStatus.ACTIVE,
         });
     }
+    // DRIVER + BLOCKED
+    users.push({
+        username: 'driver_blocked',
+        full_name: 'Driver Blocked',
+        email: buildSeedEmail('driver.blocked'),
+        phone: '0988399999',
+        roleName: 'DRIVER',
+        agencyCode: 'AGENCY_03',
+        status: UserStatus.BLOCKED,
+    });
 
     return users;
 }
@@ -93,8 +142,12 @@ export async function seedUsers(): Promise<void> {
             throw new Error(`Missing agency for user seeder: ${seed.agencyCode}`);
         }
 
+        // IMPORTANT:
+        // users uses soft-delete (deleted_at). If a username exists in soft-deleted state,
+        // normal findOne() will not return it, then insert will fail on unique(username).
         const existing = await userRepo.findOne({
             where: { username: seed.username },
+            withDeleted: true,
         });
 
         if (existing) {
@@ -105,6 +158,10 @@ export async function seedUsers(): Promise<void> {
             existing.agency_id = agency?.id ?? null;
             existing.status = seed.status ?? UserStatus.ACTIVE;
             existing.password_hash = hashedPassword;
+            // revive soft-deleted user for deterministic/idempotent seeding
+            if (existing.deleted_at) {
+                existing.deleted_at = null;
+            }
             await userRepo.save(existing);
             continue;
         }
