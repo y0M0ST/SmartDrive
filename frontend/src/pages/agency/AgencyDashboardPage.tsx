@@ -80,8 +80,8 @@ function StatCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-slate-600/50 dark:bg-[#1e293b]",
-        "md:border-border md:bg-card",
+        "rounded-2xl border border-gray-200 bg-white p-4 text-gray-800 shadow-md",
+        "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100",
         className,
       )}
     >
