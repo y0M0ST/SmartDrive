@@ -127,19 +127,19 @@ export default function MainLayout() {
               
               {/* NÚT GẠT THEME */}
               <button
-  type="button"
-  onClick={() => setTheme(isDark ? "light" : "dark")}
-  className={`relative h-5 w-10 rounded-full transition-colors duration-300 ${
-    isDark ? "bg-blue-600" : "bg-slate-300"
-  }`}
-  aria-label="Toggle theme"
->
-  <span
-    className={`absolute top-1 size-3 rounded-full bg-white transition-transform duration-300 ${
-      isDark ? "translate-x-6" : "translate-x-1"
-    }`}
-  />
-</button>
+                type="button"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                className={`relative h-6 w-11 rounded-full p-0.5 transition-colors duration-300 ${
+                  isDark ? "bg-blue-600" : "bg-slate-300"
+                }`}
+                aria-label="Toggle theme"
+              >
+                <span
+                  className={`block size-5 rounded-full bg-white shadow-sm transition-transform duration-300 ${
+                    isDark ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
 
               <Icons.Mail
                 size={20}

@@ -272,8 +272,8 @@ export default function DriverManagement() {
         <CardContent className="p-0">
           <div className="overflow-x-auto border-t border-border">
             <Table>
-              <TableHeader className="bg-muted/50 [&_tr]:border-border">
-                <TableRow className="border-border hover:bg-transparent">
+              <TableHeader className="bg-muted/50 [&_tr]:border-gray-200 dark:[&_tr]:border-gray-700">
+                <TableRow className="border-gray-200 hover:bg-transparent dark:border-gray-700">
                   <TableHead className="w-14 text-center font-bold">STT</TableHead>
                   <TableHead className="font-bold">Họ và tên</TableHead>
                   <TableHead className="font-bold">Email</TableHead>
@@ -307,7 +307,7 @@ export default function DriverManagement() {
                     const sb = statusBadge(d.status);
                     const stt = (page - 1) * PAGE_SIZE + i + 1;
                     return (
-                      <TableRow key={d.id} className="border-border hover:bg-muted/40">
+                      <TableRow key={d.id} className="border-gray-200 hover:bg-muted/40 dark:border-gray-700">
                         <TableCell className="text-center text-muted-foreground">{stt}</TableCell>
                         <TableCell className="font-bold text-foreground">{d.full_name}</TableCell>
                         <TableCell className="text-muted-foreground">{d.email}</TableCell>

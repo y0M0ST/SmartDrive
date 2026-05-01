@@ -504,8 +504,8 @@ export default function AccountManagementPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-muted/50 [&_tr]:border-border">
-                <TableRow className="border-border hover:bg-transparent">
+              <TableHeader className="bg-muted/50 [&_tr]:border-gray-200 dark:[&_tr]:border-gray-700">
+                <TableRow className="border-gray-200 hover:bg-transparent dark:border-gray-700">
                   <TableHead className="w-14 text-center font-bold">STT</TableHead>
                   <TableHead className="font-bold">Họ và tên</TableHead>
                   <TableHead className="font-bold">Email</TableHead>
@@ -541,7 +541,7 @@ export default function AccountManagementPage() {
                     return (
                       <TableRow
                         key={acc.id}
-                        className="border-border transition-colors hover:bg-muted/40"
+                        className="border-gray-200 transition-colors hover:bg-muted/40 dark:border-gray-700"
                       >
                         <TableCell className="text-center font-medium text-muted-foreground">
                           {stt}
@@ -565,35 +565,42 @@ export default function AccountManagementPage() {
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/30 dark:hover:text-amber-300"
                               title="Chỉnh sửa"
                               onClick={() => handleEdit(acc)}
                             >
-                              <Icons.Pencil className="size-4 text-amber-500" />
+                              <Icons.Pencil className="size-4" />
                             </Button>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className={
+                                acc.status === "ACTIVE"
+                                  ? "text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                                  : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300"
+                              }
                               title={acc.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa"}
                               onClick={() => toggleStatus(acc)}
                             >
                               {acc.status === "ACTIVE" ? (
-                                <Icons.Lock className="size-4 text-red-500" />
+                                <Icons.Lock className="size-4" />
                               ) : (
-                                <Icons.Unlock className="size-4 text-green-500" />
+                                <Icons.Unlock className="size-4" />
                               )}
                             </Button>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
                               title="Xóa mềm"
                               onClick={() => {
                                 setAccountToDelete(acc);
                                 setIsDeleteConfirmOpen(true);
                               }}
                             >
-                              <Icons.Trash2 className="size-4 text-red-500" />
+                              <Icons.Trash2 className="size-4" />
                             </Button>
                           </div>
                         </TableCell>

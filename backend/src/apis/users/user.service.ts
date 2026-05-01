@@ -134,7 +134,9 @@ export const getUsers = async (query: GetUserQuery, actor: ActorContext) => {
             'role.name',
             'role.description',
         ])
-        .where('1=1');
+        .where('1=1')
+        // Không cho phép admin nhìn thấy chính tài khoản đang đăng nhập trong danh sách quản lý.
+        .andWhere('user.id <> :actorId', { actorId: actor.id });
 
     if (actor.role === ROLES.AGENCY_ADMIN) {
         qb.andWhere('user.agency_id = :agencyId', { agencyId: actor.agency_id });
