@@ -1,6 +1,4 @@
 import { type ReactNode } from "react";
-// Bạn nhớ tải ảnh minh họa về và bỏ vào src/assets/login-illustration.png nhé
-import loginImg from "@/assets/login-illustration.png"; 
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -8,24 +6,42 @@ interface AuthLayoutProps {
 }
 
 export default function AuthLayout({ children, title }: AuthLayoutProps) {
+  const backgroundImageUrl =
+    "https://wallpapercave.com/wp/wp7636776.jpg";
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
-      <div className="flex w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-xl">
-        {/* Bên trái: Form */}
-        <div className="w-full p-12 md:w-1/2 flex flex-col justify-center">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">{title}</h1>
-          <p className="mb-8 text-gray-600">SmartDrive - Hệ thống quản lý thông minh </p>
+    <div
+      className="relative flex min-h-screen items-center justify-center p-4"
+      style={{
+        backgroundImage: `url(${backgroundImageUrl})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      {/* Lớp phủ đen làm tối nền đi một chút, giúp form nổi bần bật */}
+      <div className="absolute inset-0 bg-black/50" />
+
+      {/* Khung Kính bên ngoài: Đã giảm độ sáng nền và tăng độ mờ */}
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-white/10 p-8 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-lg">
+        
+        {/* Tiêu đề & Subtitle */}
+        <div className="mb-6 text-center">
+          <h1 className="mb-2 text-3xl font-extrabold text-white drop-shadow-md tracking-tight">
+            {title}
+          </h1>
+          <p className="text-white/80 font-medium">
+            SmartDrive - Hệ thống quản lý thông minh
+          </p>
+        </div>
+
+        {/* ĐÃ XÓA bg-white/90 VÀ p-5 Ở ĐÂY!
+          Giờ đây, content (form của LoginPage) sẽ hòa quyện trực tiếp vào khung kính.
+        */}
+        <div className="w-full text-slate-900">
           {children}
         </div>
         
-        {/* Bên phải: Ảnh minh họa (Chỉ hiện trên màn hình lớn) */}
-        <div className="hidden w-1/2 bg-gray-50 md:block p-12 flex items-center justify-center">
-          <img 
-            src={loginImg} 
-            alt="SmartDrive Illustration" 
-            className="w-full h-full object-cover rounded-2xl"
-          />
-        </div>
       </div>
     </div>
   );

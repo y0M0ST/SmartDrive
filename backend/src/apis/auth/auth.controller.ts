@@ -1,182 +1,74 @@
 import { Request, Response } from 'express';
-import { changePasswordService, forgotPasswordService, loginService , logoutService, resetPasswordService } from './auth.service';
-import { ApiResponse } from '../../common/types/response';
-import { AuthRequest } from '../../common/middlewares/auth.middleware';
+import { catchAsync } from '../../utils/catchAsync';
+import { ServiceResponse } from '../../models/serviceResponse';
+import * as authService from './auth.service';
 
-export const login = async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
-    const result = await loginService(email, password);
+const userIdFromReq = (req: Request) => (req as unknown as { user: { id: string } }).user.id;
 
-    switch (result.code) {
-      case 'INVALID_CREDENTIALS':
-        return res.status(401).json({
-          success: false,
-          message: 'Email hoặc mật khẩu không chính xác',
-          error: 'INVALID_CREDENTIALS'
-        } as ApiResponse);
+export const loginController = catchAsync(async (req: Request, res: Response) => {
+    // Bắt IP và User-Agent để lưu log bảo mật
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
 
-      case 'ACCOUNT_DISABLED':
-        return res.status(403).json({
-          success: false,
-          message: 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin',
-          error: 'ACCOUNT_DISABLED'
-        } as ApiResponse);
+    const result = await authService.login(req.body, ipAddress, userAgent);
 
-      default:
-        return res.status(200).json({
-          success: true,
-          message: 'Đăng nhập thành công',
-          data: result.data
-        } as ApiResponse);
+    res.status(200).json(
+        ServiceResponse.success('Đăng nhập thành công', result)
+    );
+});
+
+export const logoutController = catchAsync(async (req: Request, res: Response) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+        throw new Error('Thiếu Refresh Token!');
     }
 
-  } catch (err) {
-    console.error('[Auth] Login error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi hệ thống, vui lòng thử lại sau',
-      error: 'INTERNAL_ERROR'
-    } as ApiResponse);
-  }
-};
+    // Gọi Service để xử lý gạch bỏ phiên đăng nhập
+    await authService.logout(refreshToken);
 
-export const logout = (req: AuthRequest, res: Response) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1] as string;
-    logoutService(token);
+    // Trả về JSON thành công để Frontend yên tâm clear Local Storage và Redirect
+    res.status(200).json(
+        ServiceResponse.success('Đăng xuất thành công, hẹn gặp lại!')
+    );
+});
 
-    return res.status(200).json({
-      success: true,
-      message: 'Đăng xuất thành công'
-    } as ApiResponse);
+export const changePasswordController = catchAsync(async (req: Request, res: Response) => {
+    // GIẢ ĐỊNH: Bồ đã có authMiddleware gắn thông tin giải mã JWT vào req.user
+    const userId = userIdFromReq(req);
 
-  } catch (err) {
-    console.error('[Auth] Logout error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi hệ thống, vui lòng thử lại sau',
-      error: 'INTERNAL_ERROR'
-    } as ApiResponse);
-  }
-};
+    await authService.changePassword(userId, req.body);
 
-export const changePassword = async (req: AuthRequest, res: Response) => {
-  try {
-    const { old_password, new_password } = req.body;
-    const adminId = req.admin!.id;
+    res.status(200).json(ServiceResponse.success('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'));
+});
 
-    const result = await changePasswordService(adminId, old_password, new_password);
+export const getMeController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.getMe(userIdFromReq(req));
+    res.status(200).json(ServiceResponse.success('OK', data));
+});
 
-    switch (result.code) {
-      case 'NOT_FOUND':
-        return res.status(404).json({
-          success: false,
-          message: 'Tài khoản không tồn tại',
-          error: 'NOT_FOUND'
-        } as ApiResponse);
+export const patchMeProfileController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.updateMyProfile(userIdFromReq(req), req.body);
+    res.status(200).json(ServiceResponse.success('Cập nhật họ tên thành công.', data));
+});
 
-      case 'WRONG_OLD_PASSWORD':
-        return res.status(401).json({
-          success: false,
-          message: 'Mật khẩu hiện tại không chính xác',
-          error: 'WRONG_OLD_PASSWORD'
-        } as ApiResponse);
+export const requestContactChangeController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.requestProfileContactChange(userIdFromReq(req), req.body);
+    res.status(200).json(ServiceResponse.success(data.message, data));
+});
 
-      default:
-        return res.status(200).json({
-          success: true,
-          message: 'Đổi mật khẩu thành công'
-        } as ApiResponse);
-    }
+export const verifyContactChangeController = catchAsync(async (req: Request, res: Response) => {
+    const data = await authService.verifyProfileContactChange(userIdFromReq(req), req.body);
+    res.status(200).json(ServiceResponse.success('Cập nhật email / số điện thoại thành công.', data));
+});
 
-  } catch (err) {
-    console.error('[Auth] Change password error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi hệ thống, vui lòng thử lại sau',
-      error: 'INTERNAL_ERROR'
-    } as ApiResponse);
-  }
-};
+export const forgotPasswordController = catchAsync(async (req: Request, res: Response) => {
+    // Dù email sai hay đúng, mình vẫn trả về 1 câu chung chung để chống Hacker dò email hệ thống
+    res.status(200).json(ServiceResponse.success('Nếu email hợp lệ, hệ thống đã gửi đường dẫn khôi phục. Vui lòng kiểm tra hộp thư.'));
+});
 
-export const forgotPassword = async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    const result = await forgotPasswordService(email);
+export const resetPasswordController = catchAsync(async (req: Request, res: Response) => {
+    await authService.resetPassword(req.body);
 
-    switch (result.code) {
-      case 'EMAIL_NOT_FOUND':
-        return res.status(404).json({
-          success: false,
-          message: 'Email này không tồn tại trong hệ thống',
-          error: 'EMAIL_NOT_FOUND'
-        } as ApiResponse);
-
-      default:
-        return res.status(200).json({
-          success: true,
-          message: 'Mã OTP đã được gửi về email của bạn, có hiệu lực 15 phút'
-        } as ApiResponse);
-    }
-
-  } catch (err) {
-    console.error('[Auth] Forgot password error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi hệ thống, vui lòng thử lại sau',
-      error: 'INTERNAL_ERROR'
-    } as ApiResponse);
-  }
-};
-
-export const resetPassword = async (req: Request, res: Response) => {
-  try {
-    const { email, otp, new_password } = req.body;
-    const result = await resetPasswordService(email, otp, new_password);
-
-    switch (result.code) {
-      case 'EMAIL_NOT_FOUND':
-        return res.status(404).json({
-          success: false,
-          message: 'Email không tồn tại trong hệ thống',
-          error: 'EMAIL_NOT_FOUND'
-        } as ApiResponse);
-
-      case 'OTP_NOT_FOUND':
-        return res.status(400).json({
-          success: false,
-          message: 'Chưa có yêu cầu đặt lại mật khẩu cho email này',
-          error: 'OTP_NOT_FOUND'
-        } as ApiResponse);
-
-      case 'INVALID_OTP':
-        return res.status(400).json({
-          success: false,
-          message: 'Mã OTP không chính xác',
-          error: 'INVALID_OTP'
-        } as ApiResponse);
-
-      case 'OTP_EXPIRED':
-        return res.status(400).json({
-          success: false,
-          message: 'Mã OTP đã hết hạn, vui lòng yêu cầu gửi lại',
-          error: 'OTP_EXPIRED'
-        } as ApiResponse);
-
-      default:
-        return res.status(200).json({
-          success: true,
-          message: 'Đặt lại mật khẩu thành công, vui lòng đăng nhập lại'
-        } as ApiResponse);
-    }
-
-  } catch (err) {
-    console.error('[Auth] Reset password error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi hệ thống, vui lòng thử lại sau',
-      error: 'INTERNAL_ERROR'
-    } as ApiResponse);
-  }
-};
+    res.status(200).json(ServiceResponse.success('Đặt lại mật khẩu thành công! Giờ bạn có thể đăng nhập.'));
+});

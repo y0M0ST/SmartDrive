@@ -1,17 +1,27 @@
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8000/api", // Sau này đổi thành link API thật của nhóm
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
+  headers: { "Content-Type": "application/json" }
 });
 
-// 1. REQUEST INTERCEPTOR: "Bắt tự động nhét Token"
+// 1. REQUEST INTERCEPTOR: "Tự động nhét Token"
 api.interceptors.request.use(
   (config) => {
-    // Lấy token từ LocalStorage (thường lưu dưới tên 'access_token')
     const token = localStorage.getItem("access_token");
-    
+
+    /** FormData cần boundary tự sinh — không gửi application/json mặc định của instance */
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      const h = config.headers;
+      if (h instanceof AxiosHeaders) {
+        h.delete("Content-Type");
+      } else {
+        delete (h as Record<string, unknown>)["Content-Type"];
+      }
+    }
+
     if (token) {
-      // Nhét token vào Header theo chuẩn Bearer
+      // Giữ nguyên chuẩn Bearer vì Swagger của bạn yêu cầu SecurityScheme là bearerAuth
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -21,19 +31,19 @@ api.interceptors.request.use(
   }
 );
 
-// 2. RESPONSE INTERCEPTOR: "Đá văng ra trang Login nếu hết hạn"
+// 2. RESPONSE INTERCEPTOR: "Xử lý lỗi tập trung"
 api.interceptors.response.use(
-  (response) => response, // Nếu gọi API thành công thì trả về kết quả luôn
+  (response) => response, 
   (error) => {
-    // Kiểm tra nếu lỗi trả về là 401 (Unauthorized - Token hết hạn hoặc sai)
+    // Kiểm tra lỗi 401 (Hết hạn hoặc sai token)
     if (error.response && error.response.status === 401) {
-      console.error("Token hết hạn. Đang chuyển hướng về trang Login...");
-      
-      // Xóa token cũ đã hết hạn
-      localStorage.removeItem("access_token");
-      
-      // Đá văng ra trang Login
-      window.location.href = "/login";
+      // Chỉ redirect nếu không phải đang ở trang login (tránh vòng lặp vô tận)
+      if (!window.location.pathname.includes("/login")) {
+        console.error("Phiên đăng nhập hết hạn.");
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user_info"); // Xóa thêm thông tin user nếu có lưu
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }
