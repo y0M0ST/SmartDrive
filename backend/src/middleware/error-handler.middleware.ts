@@ -36,11 +36,11 @@ function normalizeError(err: unknown): AppError {
     }
 
     if (err instanceof TokenExpiredError) {
-        return new AppError('Token da het han.', 401);
+        return new AppError('Token da het han.', 401, undefined, 'AUTH_TOKEN_EXPIRED');
     }
 
     if (err instanceof JsonWebTokenError) {
-        return new AppError('Token khong hop le.', 401);
+        return new AppError('Token khong hop le.', 401, undefined, 'AUTH_TOKEN_INVALID');
     }
 
     if (err instanceof QueryFailedError) {
@@ -80,6 +80,7 @@ export const globalErrorHandler = (
     return res.status(appError.statusCode).json({
         status: 'error',
         message: appError.message,
+        errorCode: appError.errorCode ?? null,
         details: appError.details ?? null,
         ...(isProd ? {} : { stack: err instanceof Error ? err.stack : null }),
     });
