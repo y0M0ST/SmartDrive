@@ -262,20 +262,14 @@ export const createUser = async (input: CreateUserInput, actor: ActorContext) =>
 
     await userRepository.save(newUser);
 
-    try {
-        await sendNewAccountCredentialsEmail(
-            newUser.email,
-            newUser.full_name,
-            temporaryPassword,
-            newUser.phone,
-        );
-    } catch (error) {
-        await userRepository.delete({ id: newUser.id });
-        throw new AppError(
-            'Tao tai khoan that bai do khong gui duoc email thong tin dang nhap.',
-            500,
-        );
-    }
+    void sendNewAccountCredentialsEmail(
+        newUser.email,
+        newUser.full_name,
+        temporaryPassword,
+        newUser.phone,
+    ).catch((error) => {
+        console.error('[createUser] Failed to send credentials email:', error);
+    });
 
     return {
         id: newUser.id,

@@ -102,18 +102,19 @@ function statusDisplay(status: UserStatus): { label: string; className: string }
       return {
         label: "Hoạt động",
         className:
-          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+          "border-green-200 bg-green-50 text-green-600 ring-1 ring-green-200 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400 dark:ring-green-800/60",
       };
     case "BLOCKED":
       return {
         label: "Đã khóa",
-        className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+        className:
+          "border-red-200 bg-red-100 text-red-700 ring-1 ring-red-200 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800/60",
       };
     case "INACTIVE":
       return {
         label: "Không hoạt động",
         className:
-          "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+          "border-amber-200 bg-amber-50 text-amber-600 ring-1 ring-amber-200 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400 dark:ring-amber-800/60",
       };
     default:
       return {
@@ -488,15 +489,17 @@ export default function AccountManagementPage() {
             Làm mới
           </Button>
 
-          <Button
-            type="button"
-            onClick={openCreateModal}
-            className="h-10 rounded-xl bg-blue-600 font-bold shadow-lg hover:bg-blue-700"
-            disabled={!roles.length && !rolesForForm.length}
-          >
-            <Icons.Plus className="mr-2 size-5" />
-            Thêm tài khoản mới
-          </Button>
+          {!isSuperAdmin && (
+            <Button
+              type="button"
+              onClick={openCreateModal}
+              className="h-10 rounded-xl bg-blue-600 font-bold shadow-lg hover:bg-blue-700"
+              disabled={!roles.length && !rolesForForm.length}
+            >
+              <Icons.Plus className="mr-2 size-5" />
+              Thêm tài khoản mới
+            </Button>
+          )}
         </div>
       </div>
 
@@ -555,7 +558,10 @@ export default function AccountManagementPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge className={`rounded-lg font-bold ${sd.className}`}>
+                          <Badge
+                            variant="outline"
+                            className={`h-6 rounded-full px-2.5 text-[12px] font-semibold ${sd.className}`}
+                          >
                             {sd.label}
                           </Badge>
                         </TableCell>
