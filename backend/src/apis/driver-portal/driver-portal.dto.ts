@@ -66,10 +66,22 @@ export const tripCheckinSchema = z.object({
     params: z.object({
         tripId: z.string().uuid(),
     }),
-    body: z.object({
-        result: z.enum(['SUCCESS', 'FAILED', 'LOCKED']),
-        matchScore: z.number().finite(),
-    }),
+    /** SUCCESS bắt buộc kèm `faceEncoding` để server tự tính Euclidean — không tin matchScore từ client. */
+    body: z.discriminatedUnion('result', [
+        z.object({
+            result: z.literal('SUCCESS'),
+            matchScore: z.number().finite(),
+            faceEncoding: z.array(faceNumber).length(FACE_ENCODING_DIM),
+        }),
+        z.object({
+            result: z.literal('FAILED'),
+            matchScore: z.number().finite(),
+        }),
+        z.object({
+            result: z.literal('LOCKED'),
+            matchScore: z.number().finite(),
+        }),
+    ]),
 });
 
 export type SaveFaceTemplateBody = z.infer<typeof saveFaceTemplateBodySchema>['body'];

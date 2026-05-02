@@ -2,6 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
 import api from "@/services/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** Khớp `VehicleType` / `VehicleStatus` backend */
 export type VehicleTypeCode = "SEAT" | "SLEEPER";
@@ -83,28 +90,30 @@ const FormSelect: React.FC<{
   label: string;
   name: string;
   value: string | number;
-  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onChange: (name: string, value: string) => void;
   options: { label: string; value: string | number }[];
   disabled?: boolean;
 }> = ({ label, name, value, onChange, options, disabled }) => (
   <div className="mb-4">
-    <label htmlFor={name} className="mb-1.5 block text-sm font-bold text-slate-700 dark:text-slate-300">
+    <label className="mb-1.5 block text-sm font-bold text-slate-700 dark:text-slate-300">
       {label}
     </label>
-    <select
-      id={name}
-      name={name}
-      value={value}
-      onChange={onChange}
+    <Select
+      value={String(value)}
+      onValueChange={(next) => onChange(name, next)}
       disabled={disabled}
-      className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition-all focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
     >
-      {options.map((opt) => (
-        <option key={String(opt.value)} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger className="h-11 w-full rounded-lg border-slate-200 bg-white px-4 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+        <SelectValue placeholder={label} />
+      </SelectTrigger>
+      <SelectContent position="popper" sideOffset={4}>
+        {options.map((opt) => (
+          <SelectItem key={String(opt.value)} value={String(opt.value)}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   </div>
 );
 
@@ -148,8 +157,12 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
     setErrors({});
   }, [isOpen, mode, initialData]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [name]:
@@ -223,15 +236,15 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 h-full w-full bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div className="relative w-full max-w-lg">
-        <div className="relative animate-fade-in-up rounded-2xl border border-slate-100 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-100 px-6 pb-4 pt-6 dark:border-slate-800">
-            <h3 className="text-xl font-bold uppercase tracking-tight text-slate-900 dark:text-slate-100">
+        <div className="relative animate-fade-in-up rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 pb-4 pt-6 dark:border-slate-800">
+            <h3 className="text-xl font-bold uppercase tracking-tight text-slate-800 dark:text-slate-100">
               {mode === "edit" ? "Cập nhật thông tin xe" : "Thêm xe khách mới"}
             </h3>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full p-1.5 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-full p-1.5 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             >
               <span className="sr-only">Đóng</span>
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -255,10 +268,10 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
                 label="Loại xe"
                 name="type"
                 value={formData.type}
-                onChange={handleInputChange}
+                onChange={handleSelectChange}
                 options={[
-                  { label: "Ghế ngồi (SEAT)", value: "SEAT" },
-                  { label: "Giường nằm (SLEEPER)", value: "SLEEPER" },
+                  { label: "Ghế ngồi", value: "SEAT" },
+                  { label: "Giường nằm", value: "SLEEPER" },
                 ]}
               />
 
@@ -266,7 +279,7 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
                 label="Số chỗ"
                 name="capacity"
                 value={formData.capacity}
-                onChange={handleInputChange}
+                onChange={handleSelectChange}
                 options={[
                   { label: "16 chỗ", value: 16 },
                   { label: "29 chỗ", value: 29 },
@@ -278,7 +291,7 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
                 label="Trạng thái"
                 name="status"
                 value={formData.status}
-                onChange={handleInputChange}
+                onChange={handleSelectChange}
                 disabled={mode === "add"}
                 options={(Object.keys(STATUS_LABELS) as VehicleStatusCode[]).map((code) => ({
                   label: STATUS_LABELS[code],
@@ -295,7 +308,7 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
               />
             </div>
 
-            <div className="flex justify-center border-t border-slate-100 px-8 py-6 dark:border-slate-800">
+            <div className="flex justify-center border-t border-slate-200 px-8 py-6 dark:border-slate-800">
               <button
                 type="submit"
                 className="rounded-xl bg-sky-500 px-12 py-3 text-sm font-bold uppercase text-white shadow-lg shadow-sky-200 transition-all hover:bg-sky-600 active:scale-95"

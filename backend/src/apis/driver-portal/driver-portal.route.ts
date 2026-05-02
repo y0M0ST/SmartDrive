@@ -332,6 +332,13 @@ router.get('/me/face-template', driverPortalController.getFaceTemplate);
  *                 enum: [SUCCESS, FAILED, LOCKED]
  *               matchScore:
  *                 type: number
+ *               faceEncoding:
+ *                 type: array
+ *                 description: Bắt buộc khi result=SUCCESS — vector 128 chiều để server so khớp với DB
+ *                 items:
+ *                   type: number
+ *                 minItems: 128
+ *                 maxItems: 128
  *     responses:
  *       200:
  *         description: SUCCESS — chuyến chuyển sang IN_PROGRESS

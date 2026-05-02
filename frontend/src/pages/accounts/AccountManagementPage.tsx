@@ -51,6 +51,7 @@ interface UserItem {
   phone: string;
   status: UserStatus;
   agency_id: string | null;
+  agency?: { id: string; name: string } | null;
   role?: { id: string; name: string };
 }
 
@@ -163,6 +164,7 @@ export default function AccountManagementPage() {
     phone: "",
     role_id: "",
     agency_id: "",
+    agency_name: "",
   });
 
   const rolesForForm = useMemo(() => {
@@ -269,6 +271,7 @@ export default function AccountManagementPage() {
       phone: "",
       role_id: defaultRole,
       agency_id: userAgencyId || "",
+      agency_name: "",
     });
     setIsDialogOpen(true);
   };
@@ -281,6 +284,7 @@ export default function AccountManagementPage() {
       phone: acc.phone || "",
       role_id: acc.role?.id || "",
       agency_id: acc.agency_id || userAgencyId || "",
+      agency_name: acc.agency?.name || "",
     });
     setIsDialogOpen(true);
   };
@@ -738,7 +742,19 @@ export default function AccountManagementPage() {
                 </SelectContent>
               </Select>
             </div>
-            {isSuperAdmin && (
+            {editingAccount ? (
+              <div className="space-y-1">
+                <Label className="ml-1 text-sm font-bold text-foreground">
+                  Đại lý trực thuộc
+                </Label>
+                <Input
+                  value={formData.agency_name || "—"}
+                  readOnly
+                  disabled
+                  className="h-11 rounded-xl border-border bg-muted text-muted-foreground"
+                />
+              </div>
+            ) : isSuperAdmin ? (
               <div className="space-y-1">
                 <Label className="ml-1 text-sm font-bold text-foreground">
                   Agency ID (UUID) <span className="text-red-500">*</span>
@@ -750,7 +766,7 @@ export default function AccountManagementPage() {
                   placeholder="UUID nhà xe — bắt buộc khi tạo Quản lý nhà xe"
                 />
               </div>
-            )}
+            ) : null}
           </div>
 
           <DialogFooter className="flex items-center gap-3 p-6 pt-2">
@@ -784,8 +800,8 @@ export default function AccountManagementPage() {
               Xác nhận xóa tài khoản?
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Tài khoản <strong>{accountToDelete?.full_name}</strong> sẽ bị ẩn khỏi danh sách (xóa
-              mềm, dữ liệu lịch sử được giữ trên server). Bạn có chắc chắn?
+              Hành động này sẽ xóa tài khoản <strong>{accountToDelete?.full_name}</strong> khỏi hệ
+              thống. Bạn có chắc chắn muốn tiếp tục?
             </DialogDescription>
           </div>
           <div className="mt-6 flex gap-3">

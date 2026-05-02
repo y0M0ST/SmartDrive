@@ -199,25 +199,7 @@ export default function VehicleManagement() {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-5">
-              <button
-                type="button"
-                onClick={handleExecuteSearch}
-                className="flex items-center gap-2 text-[14px] font-bold text-muted-foreground transition-colors hover:text-primary"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 text-blue-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Tìm kiếm
-              </button>
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
@@ -250,7 +232,24 @@ export default function VehicleManagement() {
                   <option value="MAINTENANCE">Bảo dưỡng</option>
                   <option value="INACTIVE">Không hoạt động</option>
                 </select>
-              </div>
+
+              <button
+                type="button"
+                onClick={handleExecuteSearch}
+                className="flex items-center gap-2 text-[14px] font-bold text-muted-foreground transition-colors hover:text-primary"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-blue-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Tìm kiếm
+              </button>
             </div>
 
             <button

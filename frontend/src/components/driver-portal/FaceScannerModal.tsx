@@ -13,16 +13,31 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   FACE_MATCH_THRESHOLD,
+  STABLE_LOOK_TICKS_REQUIRED,
+  STABLE_LOOK_UI_HINT,
+  STABLE_LOOK_UI_TITLE,
+  detectFaceOnly,
   faceDistanceToMatchScore,
   getFaceDescriptor,
+  isFaceBoxStableInOval,
   loadFaceModels,
   type FaceDescriptorSnapshot,
 } from "@/lib/ai/faceAuth";
 import { driverApi, unwrapFaceTemplate } from "@/services/driverApi";
 
-const SCAN_INTERVAL_MS = 500;
-const REQUIRED_STREAK = 3;
+/**
+ * Máy yếu: interval quá ngắn → các lần detect chồng chéo, UI tắc. 300–350ms thường ổn định hơn 220ms.
+ */
+const SCAN_INTERVAL_MS = 320;
+const FACE_ENCODING_DIM = 128;
+/** Bước 2 (khớp mẫu): 1 khung đạt ngưỡng là gọi API ngay. Đăng ký vẫn cần ≥2 tick (anchor + xác nhận). */
+const REQUIRED_STREAK = 1;
 const MAX_MISMATCH_BEFORE_LOCK = 5;
+
+/** Không hoàn thành bước 1 (nhìn thẳng ổn định) trong thời gian này → thoát / timeout. */
+const LIVENESS_TIMEOUT_MS = 12_000;
+/** Đồng bộ UI đếm ngược / toast với `LIVENESS_TIMEOUT_MS`. */
+const LIVENESS_TIMEOUT_SEC = Math.ceil(LIVENESS_TIMEOUT_MS / 1000);
 
 const LOCKED_UI_FALLBACK =
   "Tài khoản bị tạm khóa điểm danh do thử sai quá nhiều lần. Vui lòng liên hệ bộ phận vận hành (Agency) để mở khóa.";
@@ -63,6 +78,26 @@ function drawFaceBox(
   ctx.strokeRect(box.x, box.y, box.width, box.height);
 }
 
+/** Bước 1: chỉ Tiny detect — không landmark. */
+function drawFaceDetectionOnly(
+  canvas: HTMLCanvasElement,
+  video: HTMLVideoElement,
+  detection: faceapi.WithFaceDetection<{}>,
+  ok: boolean,
+) {
+  const displaySize = { width: video.clientWidth, height: video.clientHeight };
+  if (!displaySize.width || !displaySize.height) return;
+  faceapi.matchDimensions(canvas, displaySize);
+  const resized = faceapi.resizeResults(detection, displaySize);
+  const box = resized.detection.box;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = ok ? "#22c55e" : "#ef4444";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(box.x, box.y, box.width, box.height);
+}
+
 export function FaceScannerModal({
   open,
   onOpenChange,
@@ -83,6 +118,10 @@ export function FaceScannerModal({
   const lockTriggeredRef = useRef(false);
   const failedAttemptsRef = useRef(0);
 
+  const livenessPassedRef = useRef(false);
+  const stableLookStreakRef = useRef(0);
+  const livenessStartedAtRef = useRef(0);
+
   const onCompleteRef = useRef(onComplete);
   const onOpenChangeRef = useRef(onOpenChange);
   onCompleteRef.current = onComplete;
@@ -93,6 +132,11 @@ export function FaceScannerModal({
   const [streakUi, setStreakUi] = useState(0);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockMessage, setLockMessage] = useState(LOCKED_UI_FALLBACK);
+
+  const [livenessPassed, setLivenessPassed] = useState(false);
+  const [livenessRemainingSec, setLivenessRemainingSec] = useState(LIVENESS_TIMEOUT_SEC);
+  /** Gợi ý dưới video khi bước 1: không thấy mặt / chưa đủ động tác / đang giữ chuỗi. */
+  const [liveStep1Hint, setLiveStep1Hint] = useState<string>("");
 
   const stopInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -120,6 +164,13 @@ export function FaceScannerModal({
     lockTriggeredRef.current = false;
     failedAttemptsRef.current = 0;
     setFailedAttempts(0);
+
+    livenessPassedRef.current = false;
+    stableLookStreakRef.current = 0;
+    livenessStartedAtRef.current = 0;
+    setLivenessPassed(false);
+    setLivenessRemainingSec(LIVENESS_TIMEOUT_SEC);
+    setLiveStep1Hint("");
   }, [stopInterval]);
 
   const clearCanvas = useCallback(() => {
@@ -180,16 +231,89 @@ export function FaceScannerModal({
       }
     };
 
+    const triggerRegisterLivenessTimeout = () => {
+      if (lockTriggeredRef.current || cancelled) return;
+      stopInterval();
+      toast.error(`Hết thời gian (${LIVENESS_TIMEOUT_SEC} giây) — chưa giữ mặt ổn định trong oval.`);
+      cleanupCapture();
+      setPhase("error");
+      setStatusLine("Hết thời gian — chưa giữ mặt ổn định trong oval.");
+    };
+
+    /** Hết giờ liveness: không khóa tài khoản — chỉ báo lỗi (khác với 5 lần sai khớp khuôn). */
+    const triggerCheckinLivenessTimeout = () => {
+      if (lockTriggeredRef.current || cancelled) return;
+      stopInterval();
+      toast.error(
+        `Hết thời gian (${LIVENESS_TIMEOUT_SEC} giây). Thử lại: nhìn thẳng, căn mặt trong oval. Tài khoản không bị khóa.`,
+        { duration: 8000 },
+      );
+      cleanupCapture();
+      setPhase("error");
+      setStatusLine("Hết thời gian — mở lại và giữ mặt ổn định trong khung oval.");
+      onCompleteRef.current();
+    };
+
     const tick = async () => {
       if (cancelled || lockTriggeredRef.current) return;
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (!video || !canvas || video.readyState < 2) return;
 
+      if (!livenessPassedRef.current) {
+        const elapsed = Date.now() - livenessStartedAtRef.current;
+        setLivenessRemainingSec(Math.max(0, Math.ceil((LIVENESS_TIMEOUT_MS - elapsed) / 1000)));
+        if (elapsed >= LIVENESS_TIMEOUT_MS) {
+          if (mode === "checkin") {
+            triggerCheckinLivenessTimeout();
+          } else {
+            triggerRegisterLivenessTimeout();
+          }
+          return;
+        }
+      }
+
+      if (!livenessPassedRef.current) {
+        const det = await detectFaceOnly(video);
+        if (!det) {
+          stableLookStreakRef.current = 0;
+          streakRef.current = 0;
+          setStreakUi(0);
+          setLiveStep1Hint(
+            "Chưa thấy khuôn mặt rõ — đưa mặt vào giữa oval, đủ sáng, không đeo khẩu trang.",
+          );
+          if (mode === "register") anchorRef.current = null;
+          clearCanvas();
+          return;
+        }
+
+        const inOval = isFaceBoxStableInOval(det.detection.box, video.videoWidth, video.videoHeight);
+        drawFaceDetectionOnly(canvas, video, det, inOval);
+        if (inOval) {
+          stableLookStreakRef.current += 1;
+          const st = stableLookStreakRef.current;
+          if (st >= STABLE_LOOK_TICKS_REQUIRED) {
+            livenessPassedRef.current = true;
+            setLivenessPassed(true);
+            streakRef.current = 0;
+            setStreakUi(0);
+            stableLookStreakRef.current = 0;
+            setLiveStep1Hint("");
+          } else {
+            setLiveStep1Hint(`Giữ yên · ổn định ${st}/${STABLE_LOOK_TICKS_REQUIRED} khung (khung xanh).`);
+          }
+        } else {
+          stableLookStreakRef.current = 0;
+          setLiveStep1Hint("Khung đỏ: căn mặt vào giữa oval, nhìn thẳng camera.");
+        }
+        if (!livenessPassedRef.current) return;
+      }
+
       const snap = await getFaceDescriptor(video);
       if (!snap) {
         streakRef.current = 0;
         setStreakUi(0);
+        setLiveStep1Hint("Đang lấy đặc trưng khuôn mặt — giữ mặt trong oval, đủ sáng.");
         if (mode === "register") anchorRef.current = null;
         clearCanvas();
         return;
@@ -197,12 +321,25 @@ export function FaceScannerModal({
 
       if (mode === "checkin") {
         const template = templateRef.current;
-        if (!template) return;
-        const distance = faceapi.euclideanDistance(template, snap.descriptor);
+        if (!template || template.length !== FACE_ENCODING_DIM) {
+          // eslint-disable-next-line no-console
+          console.error("[Face ID] Thiếu hoặc sai kích thước mẫu gốc — không so khớp được.");
+          return;
+        }
+        const live = snap.descriptor;
+        if (live.length !== FACE_ENCODING_DIM) {
+          // eslint-disable-next-line no-console
+          console.error("[Face ID] Descriptor live không đủ 128 chiều.");
+          return;
+        }
+        /** Luôn so live với mẫu đã fetch từ DB (`template`), không dùng anchor đăng ký. */
+        const distance = faceapi.euclideanDistance(template, live);
         const score = faceDistanceToMatchScore(distance);
         bestMatchScoreRef.current = Math.max(bestMatchScoreRef.current, score);
 
         const ok = distance < FACE_MATCH_THRESHOLD;
+        // eslint-disable-next-line no-console
+        console.log("[Face ID] Distance:", distance, "· ngưỡng <", FACE_MATCH_THRESHOLD, "· khớp UI:", ok);
         drawFaceBox(canvas, video, snap.faceApiResult, ok);
         if (ok) {
           failedAttemptsRef.current = 0;
@@ -214,18 +351,28 @@ export function FaceScannerModal({
             setPhase("submitting");
             setStatusLine("Đang xác nhận điểm danh…");
             const matchScore = faceDistanceToMatchScore(distance);
+            const faceEncoding = Array.from(live);
             try {
-              await driverApi.checkinTrip(tripId!, { result: "SUCCESS", matchScore });
+              await driverApi.checkinTrip(tripId!, { result: "SUCCESS", matchScore, faceEncoding });
               toast.success("Điểm danh thành công. Chuyến đi đã chuyển sang đang chạy.");
               cleanupCapture();
               onCompleteRef.current();
               onOpenChangeRef.current(false);
-            } catch {
-              toast.error("Gửi điểm danh thất bại. Thử lại.");
+            } catch (e: unknown) {
+              const ax = e as { response?: { data?: { message?: string; errorCode?: string } } };
+              const msg =
+                typeof ax.response?.data?.message === "string" && ax.response.data.message.trim() !== ""
+                  ? ax.response.data.message
+                  : "Gửi điểm danh thất bại. Thử lại.";
+              toast.error(msg, { duration: 8000 });
               streakRef.current = 0;
               setStreakUi(0);
               setPhase("scanning");
-              setStatusLine("Lỗi khi gửi máy chủ. Tiếp tục quét…");
+              setStatusLine(
+                ax.response?.data?.errorCode === "FACE_MISMATCH"
+                  ? "Máy chủ từ chối: khuôn mặt không khớp mẫu đã đăng ký."
+                  : "Lỗi khi gửi máy chủ. Tiếp tục quét…",
+              );
               startScanLoop();
             }
           }
@@ -312,7 +459,15 @@ export function FaceScannerModal({
               );
               return;
             }
-            templateRef.current = new Float32Array(parsed.faceEncoding);
+            const enc = parsed.faceEncoding;
+            if (enc.length !== FACE_ENCODING_DIM) {
+              setPhase("error");
+              setStatusLine("Mẫu khuôn mặt trên máy chủ không đúng định dạng (128).");
+              return;
+            }
+            templateRef.current = new Float32Array(enc);
+            // eslint-disable-next-line no-console
+            console.log("[Face ID] Đã tải mẫu gốc từ DB (anchor), dim:", enc.length);
           } catch (e: unknown) {
             const status = (e as { response?: { status?: number } })?.response?.status;
             if (status === 404) {
@@ -344,12 +499,19 @@ export function FaceScannerModal({
         video.srcObject = stream;
         await video.play();
 
+        livenessPassedRef.current = false;
+        stableLookStreakRef.current = 0;
+        livenessStartedAtRef.current = Date.now();
+        setLivenessPassed(false);
+        setLivenessRemainingSec(LIVENESS_TIMEOUT_SEC);
+
         setPhase("scanning");
         setStatusLine(
           mode === "checkin"
-            ? "Nhìn thẳng vào camera. Giữ khuôn mặt trong khung xanh…"
-            : "Nhìn thẳng vào camera để đăng ký (3 lần khớp liên tiếp).",
+            ? "Bước 1: nhìn thẳng, giữ mặt ổn định trong oval. Bước 2: khớp khuôn mặt để điểm danh."
+            : "Bước 1: nhìn thẳng trong oval. Bước 2: giữ mặt để đăng ký mẫu.",
         );
+        setLiveStep1Hint(STABLE_LOOK_UI_HINT);
         startScanLoop();
       } catch {
         if (!cancelled) {
@@ -436,32 +598,94 @@ export function FaceScannerModal({
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-black">
               <video
                 ref={videoRef}
-                className="h-full w-full object-cover"
+                className="relative z-0 h-full w-full -scale-x-100 object-cover transform"
                 muted
                 playsInline
                 autoPlay
               />
               <canvas
                 ref={canvasRef}
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                className="pointer-events-none absolute inset-0 z-10 h-full w-full -scale-x-100 transform object-cover"
                 aria-hidden
               />
+              {/* eKYC: làm tối vùng ngoài oval — lỗ trong suốt để thấy video + khung xanh canvas */}
+              {phase === "scanning" ? (
+                <>
+                  <div
+                    className="pointer-events-none absolute inset-0 z-[12] flex items-center justify-center overflow-hidden"
+                    aria-hidden
+                  >
+                    <div
+                      className="rounded-[50%] bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.62)]"
+                      style={{
+                        width: "min(54%, 13.5rem)",
+                        aspectRatio: "3 / 4",
+                        maxHeight: "78%",
+                      }}
+                    />
+                  </div>
+                  <div className="pointer-events-none absolute inset-0 z-[13] flex items-center justify-center">
+                    <div
+                      className="rounded-[50%] border-[2.5px] border-dashed border-emerald-400/95 shadow-[0_0_0_1px_rgba(0,0,0,0.2),0_0_22px_rgba(16,185,129,0.35)]"
+                      style={{
+                        width: "min(54%, 13.5rem)",
+                        aspectRatio: "3 / 4",
+                        maxHeight: "78%",
+                      }}
+                      aria-hidden
+                    />
+                  </div>
+                  <p
+                    className="pointer-events-none absolute bottom-2.5 left-0 right-0 z-20 text-center text-[10px] font-semibold tracking-wide text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                    style={{ textShadow: "0 0 8px rgba(0,0,0,0.6)" }}
+                  >
+                    Căn mặt trong khung oval — nhìn thẳng camera
+                  </p>
+                </>
+              ) : null}
+              {phase === "scanning" ? (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-2 pt-2">
+                  <div className="rounded-lg bg-amber-500 px-3 py-2 text-center shadow-lg ring-1 ring-amber-600/30">
+                    <p className="text-[13px] font-black uppercase tracking-wide text-amber-950">
+                      {STABLE_LOOK_UI_TITLE}
+                    </p>
+                    {!livenessPassed ? (
+                      <p className="mt-1 text-[11px] font-semibold text-amber-900">
+                        Bước 1 — Ổn định trong oval ({STABLE_LOOK_TICKS_REQUIRED} khung) · còn{" "}
+                        {livenessRemainingSec}s
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[11px] font-semibold text-amber-900">
+                        {`Bước 2 — Khớp khuôn mặt (Euclidean < ${FACE_MATCH_THRESHOLD}${
+                          REQUIRED_STREAK > 1 ? ` · ${REQUIRED_STREAK} khung liên tiếp` : " · một khung duy nhất"
+                        })`}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
               {phase === "loading" || phase === "submitting" ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-medium text-white">
+                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 text-sm font-medium text-white">
                   {phase === "submitting" ? "Đang xử lý…" : "Đang khởi tạo…"}
                 </div>
               ) : null}
             </div>
 
-            {mode === "checkin" && phase === "scanning" ? (
+            {mode === "checkin" && phase === "scanning" && livenessPassed ? (
               <p className="text-center text-[11px] font-medium text-amber-900/90 dark:text-amber-200/90">
-                Sai khớp liên tiếp: {failedAttempts}/{MAX_MISMATCH_BEFORE_LOCK}
+                Sai khớp khuôn mặt liên tiếp: {failedAttempts}/{MAX_MISMATCH_BEFORE_LOCK}
               </p>
             ) : null}
 
-            <p className="text-center text-[11px] text-muted-foreground">
-              Liên tiếp khớp: {streakUi}/{REQUIRED_STREAK} · Ngưỡng &lt; {FACE_MATCH_THRESHOLD}
-            </p>
+            {phase === "scanning" && livenessPassed ? (
+              <p className="text-center text-[11px] text-muted-foreground">
+                Khớp mặt: {streakUi}/{Math.max(REQUIRED_STREAK, 1)} · Ngưỡng &lt; {FACE_MATCH_THRESHOLD}
+              </p>
+            ) : phase === "scanning" && !livenessPassed ? (
+              <p className="text-center text-[11px] leading-snug text-muted-foreground">
+                {liveStep1Hint || STABLE_LOOK_UI_HINT}
+              </p>
+            ) : null}
           </>
         )}
 

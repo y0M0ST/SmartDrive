@@ -15,6 +15,27 @@ import type {
 
 const FACE_ENCODING_DIM = 128;
 
+/** Đồng bộ `FACE_MATCH_THRESHOLD` (frontend faceAuth) — `distance >=` ngưỡng → FACE_MISMATCH 400. */
+const FACE_MATCH_DISTANCE_THRESHOLD = 0.5;
+
+function faceEuclideanDistance(a: number[], b: number[]): number {
+    if (a.length !== b.length || a.length !== FACE_ENCODING_DIM) {
+        throw new AppError('Vector khuôn mặt không hợp lệ.', 400);
+    }
+    let sum = 0;
+    for (let i = 0; i < a.length; i += 1) {
+        const d = a[i]! - b[i]!;
+        sum += d * d;
+    }
+    return Math.sqrt(sum);
+}
+
+/** Giống `faceDistanceToMatchScore` trên frontend (0–100, một chữ số thập phân). */
+function distanceToMatchScore(distance: number): number {
+    const d = Math.min(Math.max(distance, 0), 1);
+    return Math.round((1 - d) * 1000) / 10;
+}
+
 export type DriverPortalRouteDto = {
     id: string;
     code: string;
@@ -222,6 +243,8 @@ const saveFaceTemplateImpl = async (driverUserId: string, body: SaveFaceTemplate
         throw new AppError(
             'Tài khoản điểm danh khuôn mặt của bạn đang bị khóa. Vui lòng liên hệ nhà xe / vận hành để mở khóa.',
             403,
+            undefined,
+            'FACE_TEMPLATE_LOCKED',
         );
     }
     profile.face_encoding = JSON.stringify(body.faceEncoding);
@@ -282,6 +305,22 @@ const checkinTripImpl = async (
     const { result, matchScore } = body;
 
     if (result === CheckinResult.SUCCESS) {
+        const storedEncoding = parseStoredFaceEncoding(profile.face_encoding);
+        if (!storedEncoding) {
+            throw new BadRequestException('Bạn chưa đăng ký mẫu khuôn mặt — không thể điểm danh bằng Face ID.');
+        }
+        const liveEncoding = assertFaceEncodingArray(body.faceEncoding);
+        const distance = faceEuclideanDistance(storedEncoding, liveEncoding);
+        if (distance >= FACE_MATCH_DISTANCE_THRESHOLD) {
+            throw new AppError(
+                'Khuôn mặt không khớp mẫu đã đăng ký (Face Mismatch). Vui lòng điểm danh bằng chính tài khoản đã đăng ký.',
+                400,
+                { distance: Math.round(distance * 1000) / 1000 },
+                'FACE_MISMATCH',
+            );
+        }
+        const verifiedMatchScore = distanceToMatchScore(distance);
+
         await AppDataSource.transaction(async (manager) => {
             const tRepo = manager.getRepository(Trip);
             const cRepo = manager.getRepository(TripCheckin);
@@ -293,7 +332,7 @@ const checkinTripImpl = async (
                     trip_id: trip.id,
                     driver_id: driverUserId,
                     device_id: null,
-                    match_score: matchScore,
+                    match_score: verifiedMatchScore,
                     result: CheckinResult.SUCCESS,
                 }),
             );

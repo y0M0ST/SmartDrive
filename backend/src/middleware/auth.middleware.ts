@@ -60,10 +60,14 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 };
 
 export const requireRole = (roles: string[]) => {
+    const allowed = roles.map((r) => String(r).trim().toUpperCase());
     return (req: Request, res: Response, next: NextFunction) => {
         const user = (req as any).user;
-        if (!user || !roles.includes(user.role)) {
-            return next(new AppError('Ban khong co quyen thuc hien thao tac nay.', 403));
+        const userRole = user?.role != null ? String(user.role).trim().toUpperCase() : '';
+        if (!user || !allowed.includes(userRole)) {
+            return next(
+                new AppError('Ban khong co quyen thuc hien thao tac nay.', 403, undefined, 'ROLE_FORBIDDEN'),
+            );
         }
         return next();
     };
