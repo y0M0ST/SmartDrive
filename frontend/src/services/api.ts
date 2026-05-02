@@ -1,4 +1,4 @@
-import axios, { AxiosHeaders } from "axios";
+import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
 import { toast } from "sonner";
 import { clearClientAuth, SESSION_EXPIRED_MESSAGE } from "@/lib/performLogout";
 
@@ -20,8 +20,8 @@ const AUTH_401_ERROR_CODES = new Set([
 
 // 1. REQUEST INTERCEPTOR: "Tự động nhét Token"
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("access_token");
+  (config: InternalAxiosRequestConfig) => {
+    const token = localStorage.getItem("access_token")?.trim();
 
     /** FormData cần boundary tự sinh — không gửi application/json mặc định của instance */
     if (typeof FormData !== "undefined" && config.data instanceof FormData) {
@@ -34,8 +34,9 @@ api.interceptors.request.use(
     }
 
     if (token) {
-      // Giữ nguyên chuẩn Bearer vì Swagger của bạn yêu cầu SecurityScheme là bearerAuth
-      config.headers.Authorization = `Bearer ${token}`;
+      const h = AxiosHeaders.from(config.headers ?? {});
+      h.set("Authorization", `Bearer ${token}`);
+      config.headers = h;
     }
     return config;
   },

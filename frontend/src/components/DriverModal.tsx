@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { AxiosError, isAxiosError } from "axios";
+import { XCircle } from "lucide-react";
 import { adminApi } from "@/services/adminApi";
 import { driverApi } from "@/services/driverApi";
 
@@ -172,6 +173,10 @@ const DriverModal = ({ isOpen, onClose, mode, initialData, onSuccess }: DriverMo
       if (row?.preview.startsWith("blob:")) URL.revokeObjectURL(row.preview);
       return prev.filter((_, i) => i !== index);
     });
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImageUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -405,6 +410,7 @@ const DriverModal = ({ isOpen, onClose, mode, initialData, onSuccess }: DriverMo
   if (!isOpen) return null;
 
   const showProfileForm = mode === "edit" && !profileLoading && !profileError && hasProfile !== null;
+  const hasAnyPreview = staged.length > 0 || existingImageUrls.length > 0;
 
   const listDriverCode = initialData?.driver_code ? String(initialData.driver_code) : "";
   const driverCodeDisplay =
@@ -577,68 +583,82 @@ const DriverModal = ({ isOpen, onClose, mode, initialData, onSuccess }: DriverMo
                   )}
                   {mode === "edit" && existingImageUrls.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
-                      {existingImageUrls.map((url) => (
-                        <img
-                          key={url}
-                          src={url}
-                          alt="Đã lưu"
-                          className="size-20 rounded-lg border border-border object-cover"
-                        />
+                      {existingImageUrls.map((url, idx) => (
+                        <div key={url} className="relative">
+                          <img
+                            src={url}
+                            alt="Đã lưu"
+                            className="size-20 rounded-lg border border-border object-cover"
+                          />
+                          <button
+                            type="button"
+                            className="absolute -right-1 -top-1 rounded-full bg-background text-red-500"
+                            onClick={() => removeExistingImage(idx)}
+                            title="Xóa ảnh"
+                          >
+                            <XCircle className="size-4" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
-                  <div
-                    onDragOver={(ev) => {
-                      ev.preventDefault();
-                      setIsDragging(true);
-                    }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={(ev) => {
-                      ev.preventDefault();
-                      setIsDragging(false);
-                      onFilesPicked(ev.dataTransfer.files);
-                    }}
-                    className={`relative flex min-h-[100px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-3 transition-all ${
-                      errors.avatar
-                        ? "border-red-500 bg-red-50 dark:bg-red-950/20"
-                        : isDragging
-                          ? "border-primary bg-primary/5"
-                          : "border-border bg-muted/40"
-                    }`}
-                  >
-                    <div className="flex flex-wrap justify-center gap-2">
+                  {staged.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-2">
                       {staged.map((s, i) => (
                         <div key={`${s.preview}-${i}`} className="relative">
                           <img src={s.preview} alt="" className="size-20 rounded-lg border border-border object-cover" />
                           <button
                             type="button"
-                            className="absolute -right-1 -top-1 rounded-full bg-red-500 p-0.5 text-white"
+                            className="absolute -right-1 -top-1 rounded-full bg-background text-red-500"
                             onClick={() => removeStaged(i)}
+                            title="Xóa ảnh"
                           >
-                            <span className="sr-only">Xóa</span>×
+                            <XCircle className="size-4" />
                           </button>
                         </div>
                       ))}
                     </div>
-                    <button
-                      type="button"
-                      className="mt-2 text-[13px] font-bold text-primary"
-                      onClick={() => document.getElementById("driverModalFiles")?.click()}
-                    >
-                      {staged.length ? "Thêm ảnh" : "Chọn hoặc kéo thả ảnh"}
-                    </button>
-                    <input
-                      id="driverModalFiles"
-                      type="file"
-                      className="hidden"
-                      multiple
-                      accept="image/jpeg,image/png,image/jpg"
-                      onChange={(ev) => {
-                        onFilesPicked(ev.target.files);
-                        ev.target.value = "";
+                  )}
+                  {!hasAnyPreview && (
+                    <div
+                      onDragOver={(ev) => {
+                        ev.preventDefault();
+                        setIsDragging(true);
                       }}
-                    />
-                  </div>
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={(ev) => {
+                        ev.preventDefault();
+                        setIsDragging(false);
+                        onFilesPicked(ev.dataTransfer.files);
+                      }}
+                      className={`relative flex min-h-[100px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-3 transition-all ${
+                        errors.avatar
+                          ? "border-red-500 bg-red-50 dark:bg-red-950/20"
+                          : isDragging
+                            ? "border-primary bg-primary/5"
+                            : "border-border bg-muted/40"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        className="mt-2 text-[13px] font-bold text-primary"
+                        onClick={() => document.getElementById("driverModalFiles")?.click()}
+                      >
+                        Chọn hoặc kéo thả ảnh
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    id="driverModalFiles"
+                    type="file"
+                    className="hidden"
+                    multiple
+                    accept="image/jpeg,image/png,image/jpg"
+                    onChange={(ev) => {
+                      onFilesPicked(ev.target.files);
+                      ev.target.value = "";
+                    }}
+                  />
                   {errors.avatar && <p className="ml-1 mt-1.5 text-xs font-medium text-red-500">{errors.avatar}</p>}
                   <p className="mt-1 text-[11px] text-muted-foreground">Định dạng .jpg hoặc .png, tối đa 5MB mỗi ảnh.</p>
                 </div>

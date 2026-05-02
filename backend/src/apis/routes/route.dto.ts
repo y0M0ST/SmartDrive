@@ -40,6 +40,7 @@ export const updateRouteSchema = z.object({
         end_point: vietnamProvinceCodeField.optional(),
         distance_km: z.number().positive().optional(),
         estimated_hours: z.number().positive().optional(),
+        status: z.enum(routeStatusOptions).optional(),
     }).refine((data) => {
         // Nếu có gửi lên cả 2 điểm thì mới check trùng
         if (data.start_point && data.end_point) {

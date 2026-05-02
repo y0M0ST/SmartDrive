@@ -8,6 +8,7 @@ Chạy thử (webcam laptop, backend đang mở):
   pip install -r requirements.txt   # gồm pygame — phát alarm_drowsy.wav / alarm_distracted.wav nếu có
   # Đặt hai file WAV cạnh smartdrive_edge_ai.py (hoặc chỉnh EDGE_ALARM_*_WAV trong .env)
   # Tuỳ chọn: EDGE_ALARM_VOLUME=0.0–1.0, EDGE_AUDIO_RECOVERY_HOLD_SEC (mặc định ~0.35s — giữ còi thêm sau khi tài xế đã ổn định)
+  # Debug HUD pitch/yaw (căn chỉnh webcam): EDGE_DEBUG_POSE=1 trong .env
   python smartdrive_edge_ai.py
 
 Test mất mạng (US_21): tắt Node, gây vi phạm → kiểm tra `database/violation_queue.db` và `cache/*.jpg`;
@@ -129,6 +130,11 @@ def estimate_head_pose_degrees(
     return rotation_vector_to_euler_degrees(rvec, tvec)
 
 
+def _edge_env_truthy(name: str) -> bool:
+    """EDGE_DEBUG_POSE=1|true|yes|on → bật HUD pose chi tiết (local test)."""
+    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _probe_network(json_url: str) -> bool:
     """Kiểm tra nhanh TCP/HTTP tới endpoint ingest (GET/HEAD đều được)."""
     try:
@@ -219,6 +225,7 @@ def main() -> int:
         )
     lat = float(os.getenv("EDGE_DEFAULT_LAT", "16.04")) if os.getenv("EDGE_DEFAULT_LAT") else None
     lng = float(os.getenv("EDGE_DEFAULT_LNG", "108.25")) if os.getenv("EDGE_DEFAULT_LNG") else None
+    debug_pose = _edge_env_truthy("EDGE_DEBUG_POSE")
 
     stop_ev = threading.Event()
     audio_alarm = AudioAlarmManager(
@@ -265,7 +272,7 @@ def main() -> int:
     audio_clear_since: Optional[float] = None
 
     logger.info(
-        "Edge AI bật | trip=%s… | EAR<thresh %.2f %.1fs | pose>%.0f° %.1fs | alarm_vol=%.2f audio_rec=%.2fs | SQLite pending=%s",
+        "Edge AI bật | trip=%s… | EAR<thresh %.2f %.1fs | pose>%.0f° %.1fs | alarm_vol=%.2f audio_rec=%.2fs | SQLite pending=%s | EDGE_DEBUG_POSE=%s",
         trip_id[:8],
         ear_thresh,
         drowsy_hold,
@@ -274,6 +281,7 @@ def main() -> int:
         max(0.0, min(1.0, alarm_volume)),
         audio_recovery,
         pm.pending_count(),
+        "on" if debug_pose else "off",
     )
 
     try:
@@ -422,6 +430,32 @@ def main() -> int:
                 (200, 200, 200),
                 2,
             )
+            if debug_pose:
+                pitch_dbg, yaw_dbg = pitch_yaw
+                max_abs = max(abs(pitch_dbg), abs(yaw_dbg))
+                line_dbg1 = (
+                    f"DBG Pose: Pitch={pitch_dbg:+.1f}  Yaw={yaw_dbg:+.1f}  max|.|={max_abs:.1f}"
+                )
+                line_dbg2 = f"thr={pose_deg:.0f}deg  pose_ok={pose_ok}  ACTIVE={pose_active}"
+                dbg_color = (0, 255, 0) if pose_ok else (0, 128, 255)
+                cv2.putText(
+                    frame,
+                    line_dbg1,
+                    (10, h - 52),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    dbg_color,
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    line_dbg2,
+                    (10, h - 28),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (220, 220, 220),
+                    1,
+                )
             cv2.putText(
                 frame,
                 f"queue_pending~{pending_hud}",

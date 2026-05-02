@@ -43,7 +43,36 @@ interface DriverAccountRow {
   phone: string;
   status: UserStatus;
   driver_code?: string | null;
+  license_class?: string | null;
+  license_expires_at?: string | null;
   has_driver_profile?: boolean;
+}
+
+function formatDateVn(value?: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+type LicenseExpiryState = "missing" | "expired" | "soon" | "valid";
+
+function getLicenseExpiryState(value?: string | null): LicenseExpiryState {
+  if (!value) return "missing";
+  const expiresAt = new Date(value);
+  if (Number.isNaN(expiresAt.getTime())) return "missing";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  expiresAt.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.ceil((expiresAt.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays < 0) return "expired";
+  if (diffDays <= 30) return "soon";
+  return "valid";
 }
 
 function statusBadge(status: UserStatus) {
@@ -144,6 +173,9 @@ export default function DriverManagement() {
           status: (u.status as UserStatus) || "ACTIVE",
           driver_code: u.driver_code ?? null,
           has_driver_profile: Boolean(u.has_driver_profile),
+          license_class: typeof u.license_class === "string" ? u.license_class : null,
+          license_expires_at:
+            typeof u.license_expires_at === "string" ? u.license_expires_at : null,
         })),
       );
       setMeta({
@@ -281,26 +313,28 @@ export default function DriverManagement() {
                   <TableHead className="font-bold">Email</TableHead>
                   <TableHead className="font-bold">Điện thoại</TableHead>
                   <TableHead className="font-bold">Hồ sơ TX</TableHead>
+                  <TableHead className="font-bold">Hạng bằng lái</TableHead>
+                  <TableHead className="font-bold">Ngày hết hạn</TableHead>
                   <TableHead className="font-bold">Trạng thái</TableHead>
-                  <TableHead className="text-right font-bold">Thao tác</TableHead>
+                  <TableHead className="text-center font-bold">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!driverRoleId ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
                       Đang tải cấu hình…
                     </TableCell>
                   </TableRow>
                 ) : loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
                       Đang tải…
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-12 text-center text-muted-foreground">
                       Chưa có tài xế. Bấm &quot;Thêm tài xế&quot; để tạo tài khoản và hồ sơ.
                     </TableCell>
                   </TableRow>
@@ -326,6 +360,33 @@ export default function DriverManagement() {
                             </Badge>
                           )}
                         </TableCell>
+                        <TableCell className="font-semibold text-foreground">
+                          {d.license_class || "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {(() => {
+                            const expiryState = getLicenseExpiryState(d.license_expires_at);
+                            const displayDate = formatDateVn(d.license_expires_at);
+                            if (expiryState === "missing") return "—";
+                            if (expiryState === "expired") {
+                              return (
+                                <span className="inline-flex items-center gap-1 font-medium text-red-600 dark:text-red-400">
+                                  <Icons.AlertCircle className="size-[14px]" />
+                                  {displayDate}
+                                </span>
+                              );
+                            }
+                            if (expiryState === "soon") {
+                              return (
+                                <span className="inline-flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
+                                  <Icons.TriangleAlert className="size-[14px]" />
+                                  {displayDate}
+                                </span>
+                              );
+                            }
+                            return <span>{displayDate}</span>;
+                          })()}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
@@ -334,37 +395,48 @@ export default function DriverManagement() {
                             {sb.label}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-wrap justify-end gap-1">
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1.5">
                             <Button
                               type="button"
-                              size="sm"
-                              variant="outline"
-                              className="rounded-lg border-border"
+                              variant="ghost"
+                              size="icon"
+                              title="Sửa"
+                              className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/30 dark:hover:text-amber-300"
                               onClick={() => openEdit(d)}
                             >
-                              Sửa
+                              <Icons.Pencil className="size-4" />
                             </Button>
                             <Button
                               type="button"
-                              size="sm"
-                              variant="outline"
-                              className="rounded-lg border-border"
+                              variant="ghost"
+                              size="icon"
+                              title={d.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                              className={
+                                d.status === "ACTIVE"
+                                  ? "text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                                  : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300"
+                              }
                               onClick={() => toggleStatus(d)}
                             >
-                              {d.status === "ACTIVE" ? "Khóa" : "Mở khóa"}
+                              {d.status === "ACTIVE" ? (
+                                <Icons.Lock className="size-4" />
+                              ) : (
+                                <Icons.Unlock className="size-4" />
+                              )}
                             </Button>
                             <Button
                               type="button"
-                              size="sm"
-                              variant="outline"
-                              className="rounded-lg border-destructive/50 text-destructive hover:bg-destructive/10"
+                              variant="ghost"
+                              size="icon"
+                              title="Xóa"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
                               onClick={() => {
                                 setToDelete(d);
                                 setDeleteOpen(true);
                               }}
                             >
-                              Xóa
+                              <Icons.Trash2 className="size-4" />
                             </Button>
                           </div>
                         </TableCell>

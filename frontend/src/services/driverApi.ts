@@ -1,4 +1,10 @@
 import api from "./api";
+
+/** Đảm bảo Bearer luôn gửi kèm (bổ sung cho interceptor — tránh edge case header merge). */
+function bearerHeaders(): Record<string, string> {
+  const token = localStorage.getItem("access_token")?.trim();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 import type { DriverMyTripsPayload } from "@/types/driverPortal";
 import type { DriverViolationsPayload } from "@/types/driverViolations";
 import type { DriverStatisticsPayload } from "@/types/driverStatistics";
@@ -99,8 +105,13 @@ export const driverApi = {
     }),
 
   /** US_18 — lấy mẫu vector (404 nếu chưa đăng ký). */
-  getFaceTemplate: () => api.get("/driver/me/face-template"),
-  saveFaceTemplate: (faceEncoding: number[]) => api.post("/driver/me/face-template", { faceEncoding }),
-  checkinTrip: (tripId: string, body: { result: "SUCCESS" | "FAILED" | "LOCKED"; matchScore: number }) =>
-    api.post(`/driver/me/trips/${tripId}/checkin`, body),
+  getFaceTemplate: () => api.get("/driver/me/face-template", { headers: bearerHeaders() }),
+  saveFaceTemplate: (faceEncoding: number[]) =>
+    api.post("/driver/me/face-template", { faceEncoding }, { headers: bearerHeaders() }),
+  checkinTrip: (
+    tripId: string,
+    body:
+      | { result: "SUCCESS"; matchScore: number; faceEncoding: number[] }
+      | { result: "FAILED" | "LOCKED"; matchScore: number },
+  ) => api.post(`/driver/me/trips/${tripId}/checkin`, body, { headers: bearerHeaders() }),
 };

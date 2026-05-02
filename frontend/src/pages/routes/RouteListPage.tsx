@@ -11,6 +11,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -154,6 +161,7 @@ export default function RouteListPage() {
     distance: "",
     durationText: "",
     estimatedHours: "",
+    status: "ACTIVE" as RouteStatus,
   });
 
   const provinceByCode = useMemo(() => {
@@ -272,6 +280,7 @@ export default function RouteListPage() {
       distance: "",
       durationText: "",
       estimatedHours: "",
+      status: "ACTIVE" as RouteStatus,
     });
     setEditingRoute(null);
     setIsCalculating(false);
@@ -337,7 +346,10 @@ export default function RouteListPage() {
 
     try {
       if (editingRoute) {
-        await routeApi.update(editingRoute.id, payload);
+        await routeApi.update(editingRoute.id, {
+          ...payload,
+          status: formData.status,
+        });
         toast.success("Cập nhật tuyến thành công.");
       } else {
         await routeApi.create(payload);
@@ -376,6 +388,7 @@ export default function RouteListPage() {
       distance: String(route.distance_km),
       durationText: formatDurationVi(sec),
       estimatedHours: route.estimated_hours.toFixed(2),
+      status: route.status,
     });
     setIsDialogOpen(true);
   };
@@ -562,10 +575,32 @@ export default function RouteListPage() {
                   onChange={(e) => onEstimatedHoursInput(e.target.value)}
                 />
                 <p className="text-[11px] leading-snug text-muted-foreground">
-                  Mapbox điền sẵn sau khi chọn điểm đi/đến; có thể chỉnh tay khi cần (lộ trình, ùn tắc).
+                  Hệ thống tự động tính toán sau khi chọn điểm đi/đến. Bạn có thể điều chỉnh thủ công nếu cần.
                 </p>
               </div>
             </div>
+
+            {editingRoute && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right font-bold text-foreground">Trạng thái</Label>
+                <div className="col-span-3">
+                  <Select
+                    value={formData.status}
+                    onValueChange={(v) =>
+                      setFormData((prev) => ({ ...prev, status: v as RouteStatus }))
+                    }
+                  >
+                    <SelectTrigger className="h-11 w-full border-border bg-background">
+                      <SelectValue placeholder="Chọn trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE">Đang khai thác</SelectItem>
+                      <SelectItem value="SUSPENDED">Tạm ngưng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-2 border-t border-border bg-muted/40 p-6">
