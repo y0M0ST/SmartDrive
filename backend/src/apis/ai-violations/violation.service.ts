@@ -1,6 +1,7 @@
 import { SelectQueryBuilder } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { AiViolation } from '../../entities/ai-violation.entity';
+import { AppError } from '../../common/errors/app-error';
 import type { GetAgencyViolationsQuery } from './violation.dto';
 import { vnDayEndIsoDate, vnDayStartIsoDate, vnTodayRange } from '../../common/utils/vn-timezone';
 
@@ -190,3 +191,53 @@ export const ViolationService = {
 };
 
 export const getAgencyViolations = ViolationService.getAgencyViolations;
+
+/**
+ * US_10 — Số vi phạm chưa đọc (is_read = false) thuộc agency.
+ * Giới hạn hiển thị 99+ khi vượt ngưỡng để khớp với badge frontend.
+ */
+export const getUnreadCount = async (agencyId: string): Promise<{ count: number; capped: boolean }> => {
+    const repo = AppDataSource.getRepository(AiViolation);
+    const total = await repo
+        .createQueryBuilder('v')
+        .where(
+            'EXISTS (SELECT 1 FROM trips t WHERE t.id = v.trip_id AND t.agency_id = :agencyId)',
+            { agencyId },
+        )
+        .andWhere('v.is_read = false')
+        .getCount();
+
+    return { count: Math.min(total, 99), capped: total > 99 };
+};
+
+/**
+ * US_10 — Acknowledge vi phạm: set is_read=true, ghi acknowledged_by + acknowledged_at.
+ * Chỉ update nếu violation thuộc agency của người dùng (chống IDOR).
+ */
+export const acknowledgeViolation = async (
+    violationId: string,
+    agencyId: string,
+    userId: string,
+): Promise<AiViolation> => {
+    const repo = AppDataSource.getRepository(AiViolation);
+
+    const violation = await repo
+        .createQueryBuilder('v')
+        .where('v.id = :violationId', { violationId })
+        .andWhere(
+            'EXISTS (SELECT 1 FROM trips t WHERE t.id = v.trip_id AND t.agency_id = :agencyId)',
+            { agencyId },
+        )
+        .getOne();
+
+    if (!violation) {
+        throw new AppError('Không tìm thấy vi phạm hoặc bạn không có quyền truy cập.', 404);
+    }
+
+    violation.is_read = true;
+    violation.acknowledged_by = userId;
+    violation.acknowledged_at = new Date();
+    await repo.save(violation);
+
+    return violation;
+};

@@ -2,6 +2,8 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import morgan from 'morgan';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import { AppDataSource } from './config/data-source';
 import apiRoutes from './apis';
 import { setupSwagger } from './api-docs/swagger';
@@ -9,9 +11,18 @@ import {
     globalErrorHandler,
     notFoundHandler,
 } from './middleware/error-handler.middleware';
+import { initSocketService } from './socket/socket.service';
 
 const port = process.env.PORT || 3000;
 const app = express();
+
+// Bọc Express trong HTTP server để Socket.io có thể attach vào cùng cổng
+const httpServer = createServer(app);
+
+const io = new Server(httpServer, {
+    cors: { origin: '*', methods: ['GET', 'POST'] },
+});
+initSocketService(io);
 
 app.use(cors());
 app.use(express.json());
@@ -25,7 +36,7 @@ app.use(globalErrorHandler);
 AppDataSource.initialize()
     .then(() => {
         console.log('Đã kết nối thành công tới Database!');
-        app.listen(port, () => {
+        httpServer.listen(port, () => {
             console.log(`Server dang chay o cong ${port}`);
             console.log(`Swagger docs: http://localhost:${port}/api/docs`);
         });

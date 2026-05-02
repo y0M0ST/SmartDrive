@@ -1,10 +1,11 @@
 import { AppDataSource } from '../../config/data-source';
 import { Trip } from '../../entities/trip.entity';
+import { AiViolation } from '../../entities/ai-violation.entity';
 import { DriverProfile } from '../../entities/driver-profile.entity';
 import { TripCheckin } from '../../entities/trip-checkin.entity';
 import { CheckinResult, TripStatus } from '../../common/constants/enums';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
-import type { GetMyTripsQuery, SaveFaceTemplateBody, TripCheckinBody } from './driver-portal.dto';
+import type { GetMyTripsQuery, GetMyViolationsQuery, SaveFaceTemplateBody, TripCheckinBody } from './driver-portal.dto';
 
 const FACE_ENCODING_DIM = 128;
 
@@ -270,14 +271,59 @@ const checkinTripImpl = async (
     throw new BadRequestException(CHECKIN_FAIL_MESSAGE);
 };
 
+/**
+ * US_17 — Tài xế xem danh sách vi phạm AI của chính mình.
+ * `driverUserId` lấy từ JWT (chống IDOR).
+ */
+const getMyViolationsImpl = async (driverUserId: string, query: GetMyViolationsQuery) => {
+    const { page, limit, type } = query;
+    const skip = (page - 1) * limit;
+
+    const repo = AppDataSource.getRepository(AiViolation);
+    const qb = repo
+        .createQueryBuilder('v')
+        .leftJoin('trips', 'trip', 'trip.id = v.trip_id')
+        .leftJoin('routes', 'route', 'route.id = trip.route_id')
+        .select('v.id', 'id')
+        .addSelect('v.type', 'type')
+        .addSelect('v.image_url', 'image_url')
+        .addSelect('v.latitude', 'latitude')
+        .addSelect('v.longitude', 'longitude')
+        .addSelect('v.occurred_at', 'occurred_at')
+        .addSelect('v.trip_id', 'trip_id')
+        .addSelect('trip.trip_code', 'trip_code')
+        .addSelect('route.name', 'route_name')
+        .addSelect('route.start_point', 'route_start_point')
+        .addSelect('route.end_point', 'route_end_point')
+        .where('v.driver_id = :driverUserId', { driverUserId })
+        .orderBy('v.occurred_at', 'DESC');
+
+    if (type) qb.andWhere('v.type = :type', { type });
+
+    const total = await qb.getCount();
+    const rows = await qb.skip(skip).take(limit).getRawMany();
+
+    return {
+        data: rows,
+        meta: {
+            total,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit) || 1,
+            limit,
+        },
+    };
+};
+
 export const DriverPortalService = {
     getMyTrips: getMyTripsImpl,
     saveFaceTemplate: saveFaceTemplateImpl,
     getFaceTemplate: getFaceTemplateImpl,
     checkinTrip: checkinTripImpl,
+    getMyViolations: getMyViolationsImpl,
 };
 
 export const getMyTrips = DriverPortalService.getMyTrips;
 export const saveFaceTemplate = DriverPortalService.saveFaceTemplate;
 export const getFaceTemplate = DriverPortalService.getFaceTemplate;
 export const checkinTrip = DriverPortalService.checkinTrip;
+export const getMyViolations = DriverPortalService.getMyViolations;

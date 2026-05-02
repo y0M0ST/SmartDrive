@@ -9,10 +9,10 @@ export class DriverScore extends CoreEntity {
     @Column({ type: 'uuid' })
     driver_id: string;
 
-    @Column({ type: 'int' })
+    @Column({ type: 'int', default: 0 })
     month: number;
 
-    @Column({ type: 'int' })
+    @Column({ type: 'int', default: 0 })
     year: number;
 
     @Column({ type: 'int', default: 0 })

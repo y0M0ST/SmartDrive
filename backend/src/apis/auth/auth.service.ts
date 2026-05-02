@@ -48,7 +48,7 @@ export const login = async (
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-        throw new Error('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin');
+        throw new AppError('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin', 403);
     }
 
     const isPasswordMatch = await bcrypt.compare(

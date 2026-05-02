@@ -4,6 +4,7 @@ import { validate } from '../../middleware/validate.middleware';
 import * as driverPortalController from './driver-portal.controller';
 import {
     getMyTripsQuerySchema,
+    getMyViolationsQuerySchema,
     saveFaceTemplateBodySchema,
     tripCheckinSchema,
 } from './driver-portal.dto';
@@ -53,6 +54,37 @@ router.use(authMiddleware, requireRole(['DRIVER']));
  *         description: Không phải tài xế (DRIVER)
  */
 router.get('/me/trips', validate(getMyTripsQuerySchema), driverPortalController.getMyTrips);
+
+/**
+ * @swagger
+ * /api/driver/me/violations:
+ *   get:
+ *     summary: Danh sách vi phạm AI của tài xế đang đăng nhập (US_17)
+ *     description: |
+ *       Chỉ role **DRIVER**. `driver_id` lấy từ JWT — không nhận từ query/body (chống IDOR).
+ *       Trả về vi phạm kèm thông tin chuyến đi, tuyến đường. Sắp xếp `occurred_at` giảm dần.
+ *     tags: [Driver Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *       - in: query
+ *         name: type
+ *         schema: { type: string, enum: [DROWSY, DISTRACTED] }
+ *     responses:
+ *       200:
+ *         description: Danh sách vi phạm
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải tài xế (DRIVER)
+ */
+router.get('/me/violations', validate(getMyViolationsQuerySchema), driverPortalController.getMyViolations);
 
 /**
  * @swagger

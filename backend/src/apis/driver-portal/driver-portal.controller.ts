@@ -3,7 +3,7 @@ import { catchAsync } from '../../utils/catchAsync';
 import { ServiceResponse } from '../../models/serviceResponse';
 import { AppError } from '../../common/errors/app-error';
 import * as driverPortalService from './driver-portal.service';
-import { getMyTripsQuerySchema } from './driver-portal.dto';
+import { getMyTripsQuerySchema, getMyViolationsQuerySchema } from './driver-portal.dto';
 import type { SaveFaceTemplateBody, TripCheckinBody } from './driver-portal.dto';
 
 const getDriverUserIdFromJwt = (req: Request) => {
@@ -40,6 +40,13 @@ export const getFaceTemplate = catchAsync(async (req: Request, res: Response) =>
     const driverUserId = getDriverUserIdFromJwt(req);
     const data = await driverPortalService.getFaceTemplate(driverUserId);
     res.status(200).json(ServiceResponse.success('Lấy mẫu khuôn mặt thành công.', data));
+});
+
+export const getMyViolations = catchAsync(async (req: Request, res: Response) => {
+    const driverUserId = getDriverUserIdFromJwt(req);
+    const parsed = getMyViolationsQuerySchema.parse({ query: req.query });
+    const result = await driverPortalService.getMyViolations(driverUserId, parsed.query);
+    res.status(200).json(ServiceResponse.success('Lấy danh sách vi phạm của bạn thành công', result));
 });
 
 export const checkinTrip = catchAsync(async (req: Request, res: Response) => {

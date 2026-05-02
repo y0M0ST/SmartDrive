@@ -83,4 +83,55 @@ router.use(authMiddleware, requireRole(['AGENCY_ADMIN']));
  */
 router.get('/', validate(getAgencyViolationsQuerySchema), violationController.getAgencyViolations);
 
+/**
+ * @swagger
+ * /api/agencies/violations/unread-count:
+ *   get:
+ *     summary: Số vi phạm AI chưa đọc — dùng cho badge chuông topbar (US_10)
+ *     description: |
+ *       Trả về `count` (tối đa 99) và `capped` (true nếu thực tế > 99).
+ *       Chỉ tính các vi phạm `is_read = false` thuộc chuyến của nhà xe trong JWT.
+ *     tags: [AI Violations]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ count: number, capped: boolean }"
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không đủ quyền
+ */
+router.get('/unread-count', violationController.getUnreadCount);
+
+/**
+ * @swagger
+ * /api/agencies/violations/{id}/acknowledge:
+ *   patch:
+ *     summary: Đánh dấu đã xem vi phạm AI (US_10)
+ *     description: |
+ *       Set `is_read = true`, ghi `acknowledged_by` (user JWT) và `acknowledged_at`.
+ *       Vi phạm phải thuộc nhà xe trong JWT — sai agency trả 404.
+ *     tags: [AI Violations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Acknowledge thành công — trả về is_read, acknowledged_by, acknowledged_at
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không đủ quyền
+ *       404:
+ *         description: Không tìm thấy vi phạm hoặc không thuộc nhà xe
+ */
+router.patch('/:id/acknowledge', violationController.acknowledgeViolation);
+
 export default router;

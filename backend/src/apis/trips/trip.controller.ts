@@ -53,3 +53,9 @@ export const createTrip = catchAsync(async (req: Request, res: Response) => {
     const result = await tripService.createTrip(req.body, agencyId);
     res.status(201).json(ServiceResponse.success('Tạo chuyến đi mới thành công', result));
 });
+
+export const getTripGpsHistory = catchAsync(async (req: Request, res: Response) => {
+    const agencyId = getAgencyIdFromAgencyAdmin(req);
+    const result = await tripService.getGpsHistory(req.params.id as string, agencyId);
+    res.status(200).json(ServiceResponse.success('Lấy lịch sử GPS thành công', result));
+});

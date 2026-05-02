@@ -37,3 +37,16 @@ export const tripCheckinSchema = z.object({
 
 export type SaveFaceTemplateBody = z.infer<typeof saveFaceTemplateBodySchema>['body'];
 export type TripCheckinBody = z.infer<typeof tripCheckinSchema>['body'];
+
+const defaultMyViolationsPage = (v: unknown) => (v === undefined || v === null || v === '' ? 1 : v);
+const defaultMyViolationsLimit = (v: unknown) => (v === undefined || v === null || v === '' ? 20 : v);
+
+export const getMyViolationsQuerySchema = z.object({
+    query: z.object({
+        page: z.preprocess(defaultMyViolationsPage, z.coerce.number().int().min(1)),
+        limit: z.preprocess(defaultMyViolationsLimit, z.coerce.number().int().min(1).max(100)),
+        type: z.enum(['DROWSY', 'DISTRACTED']).optional(),
+    }),
+});
+
+export type GetMyViolationsQuery = z.infer<typeof getMyViolationsQuerySchema>['query'];

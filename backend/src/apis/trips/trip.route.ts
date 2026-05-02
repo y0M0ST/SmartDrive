@@ -204,4 +204,30 @@ router.get('/', validate(getTripQuerySchema), tripController.getTrips);
 router.post('/', validate(createTripSchema), tripController.createTrip);
 router.get('/:id', validate(tripIdParamSchema), tripController.getTripDetail);
 
+/**
+ * @swagger
+ * /api/agencies/trips/{id}/gps:
+ *   get:
+ *     summary: Lịch sử tọa độ GPS của chuyến (PB_09)
+ *     description: Trả về toàn bộ gps_logs theo thứ tự thời gian tăng dần để vẽ bản đồ.
+ *     tags: [Trips]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Danh sách GpsLog
+ *       403:
+ *         description: Chuyến không thuộc nhà xe
+ *       404:
+ *         description: Không tìm thấy chuyến
+ */
+router.get('/:id/gps', validate(tripIdParamSchema), tripController.getTripGpsHistory);
+
 export default router;

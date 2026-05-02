@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { Trip } from '../../entities/trip.entity';
+import { GpsLog } from '../../entities/gps-log.entity';
 import { Route } from '../../entities/route.entity';
 import { Vehicle } from '../../entities/vehicle.entity';
 import { User } from '../../entities/user.entity';
@@ -164,6 +165,25 @@ export const getTrips = async (query: GetTripQuery, agencyId: string) => {
         data,
         meta: { total, currentPage: page, totalPages: Math.ceil(total / limit) || 1 },
     };
+};
+
+/**
+ * PB_09 — Lịch sử GPS của một chuyến (dùng để vẽ đường đi khi mở map).
+ * Trả về danh sách tọa độ theo thứ tự thời gian tăng dần.
+ * Bảo mật: trip phải thuộc agencyId trong JWT.
+ */
+export const getGpsHistory = async (tripId: string, agencyId: string): Promise<GpsLog[]> => {
+    const tripRepo = AppDataSource.getRepository(Trip);
+    const gpsLogRepo = AppDataSource.getRepository(GpsLog);
+
+    const trip = await tripRepo.findOne({ where: { id: tripId } });
+    if (!trip) throw new AppError('Không tìm thấy chuyến đi.', 404);
+    if (trip.agency_id !== agencyId) throw new AppError('Bạn không có quyền xem chuyến đi này.', 403);
+
+    return gpsLogRepo.find({
+        where: { trip_id: tripId },
+        order: { recorded_at: 'ASC' },
+    });
 };
 
 export const createTrip = async (createTripDto: CreateTripInput, agencyId: string) => {

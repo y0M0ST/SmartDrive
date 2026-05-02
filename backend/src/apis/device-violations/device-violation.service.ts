@@ -2,10 +2,13 @@ import { QueryFailedError } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { AiViolation } from '../../entities/ai-violation.entity';
 import { Trip } from '../../entities/trip.entity';
+import { User } from '../../entities/user.entity';
+import { Vehicle } from '../../entities/vehicle.entity';
 import { ViolationConfig } from '../../entities/violation-config.entity';
 import { TripStatus } from '../../common/constants/enums';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
 import { uploadImageBufferToCloudinary } from '../../utils/cloudinary';
+import { emitAiViolationAlert } from '../../socket/socket.service';
 import { deviceViolationMetadataSchema, type DeviceViolationMetadata } from './device-violation.dto';
 
 export type DeviceViolationIngestAck = {
@@ -127,6 +130,9 @@ export const ingestDeviceViolation = async (
         throw err;
     }
 
+    // US_10 — Emit realtime tới agency room sau khi lưu thành công
+    void emitViolationAlertToAgency(row.id, trip);
+
     return {
         message: 'Đã ghi nhận vi phạm AI và đồng bộ thành công.',
         data: {
@@ -136,4 +142,37 @@ export const ingestDeviceViolation = async (
             imageUrl,
         },
     };
+};
+
+const emitViolationAlertToAgency = async (violationId: string, trip: Trip): Promise<void> => {
+    try {
+        const userRepo = AppDataSource.getRepository(User);
+        const vehicleRepo = AppDataSource.getRepository(Vehicle);
+        const violationRepo = AppDataSource.getRepository(AiViolation);
+
+        const [violation, driver, vehicle] = await Promise.all([
+            violationRepo.findOne({ where: { id: violationId } }),
+            userRepo.findOne({ where: { id: trip.driver_id } }),
+            vehicleRepo.findOne({ where: { id: trip.vehicle_id } }),
+        ]);
+
+        if (!violation) return;
+
+        emitAiViolationAlert(trip.agency_id, {
+            violationId: violation.id,
+            tripId: trip.id,
+            tripCode: trip.trip_code ?? null,
+            driverId: trip.driver_id,
+            driverName: driver?.full_name ?? null,
+            vehicleId: trip.vehicle_id,
+            licensePlate: vehicle?.license_plate ?? null,
+            type: violation.type,
+            imageUrl: violation.image_url,
+            latitude: violation.latitude ?? null,
+            longitude: violation.longitude ?? null,
+            occurredAt: violation.occurred_at.toISOString(),
+        });
+    } catch {
+        // Emit thất bại không được làm hỏng response chính
+    }
 };
