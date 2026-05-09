@@ -5,7 +5,7 @@ US_19 / US_21 — Edge AI: EAR + Head pose, cảnh báo âm thanh WAV (pygame, t
 Chạy thử (webcam laptop, backend đang mở):
   cd ai_module
   copy .env.example .env   # điền MASTER_DEVICE_API_KEY, CURRENT_TRIP_ID, SMARTDRIVE_DEVICE_VIOLATION_JSON_URL
-  pip install -r requirements.txt   # gồm pygame — phát alarm_drowsy.wav / alarm_distracted.wav nếu có
+  pip install -r requirements.txt   # gồm pygame — phát canhBaoBuonNgu.mp3 / canhBaoMatTapTrung.mp3 nếu có
   # Đặt hai file WAV cạnh smartdrive_edge_ai.py (hoặc chỉnh EDGE_ALARM_*_WAV trong .env)
   # Tuỳ chọn: EDGE_ALARM_VOLUME=0.0–1.0, EDGE_AUDIO_RECOVERY_HOLD_SEC (mặc định ~0.35s — giữ còi thêm sau khi tài xế đã ổn định)
   # Debug HUD pitch/yaw (căn chỉnh webcam): EDGE_DEBUG_POSE=1 trong .env
@@ -49,7 +49,7 @@ load_dotenv(_ENV_PATH)
 # Trùng backend `device-auth` — bắt buộc header `x-device-api-key` khi POST ingest.
 MASTER_DEVICE_API_KEY = (os.getenv("MASTER_DEVICE_API_KEY") or "").strip()
 
-from api_client import send_violation_json  # noqa: E402
+from api_client import send_violation_json_detailed  # noqa: E402
 from audio_alarm_manager import AudioAlarmManager  # noqa: E402
 from persistence_manager import PersistenceManager, image_path_to_base64  # noqa: E402
 
@@ -175,7 +175,7 @@ def sync_worker_loop(
                     logger.warning("Mất file ảnh — bỏ hàng queue: %s", row.device_event_id[:16])
                     pm.mark_as_sent(row.device_event_id)
                     continue
-                ok = send_violation_json(
+                ok, status_code, resp_text = send_violation_json_detailed(
                     row.payload["trip_id"],
                     row.payload["violation_type"],
                     image_base64=b64,
@@ -189,8 +189,17 @@ def sync_worker_loop(
                     pm.mark_as_sent(row.device_event_id)
                     logger.info("Đã sync violation | id=%s…", row.device_event_id[:12])
                 else:
-                    pm.increment_retry(row.device_event_id)
-                    logger.info("Chưa sync được — giữ SQLite, retry+1 | %s…", row.device_event_id[:12])
+                    # 404 "Không tìm thấy chuyến đi" là lỗi dữ liệu không thể tự hồi phục:
+                    # giữ lại sẽ retry vô hạn và spam log.
+                    if status_code == 404 and "Không tìm thấy chuyến đi" in (resp_text or ""):
+                        pm.mark_as_sent(row.device_event_id)
+                        logger.warning(
+                            "Drop pending do trip không tồn tại (HTTP 404) | %s…",
+                            row.device_event_id[:12],
+                        )
+                    else:
+                        pm.increment_retry(row.device_event_id)
+                        logger.info("Chưa sync được — giữ SQLite, retry+1 | %s…", row.device_event_id[:12])
             pm.prune_cache_orphans()
         if stop.wait(interval_sec):
             break
@@ -231,8 +240,8 @@ def main() -> int:
     audio_alarm = AudioAlarmManager(
         _MODULE_DIR,
         stop_ev,
-        drowsy_wav=(os.getenv("EDGE_ALARM_DROWSY_WAV") or "alarm_drowsy.wav").strip(),
-        distracted_wav=(os.getenv("EDGE_ALARM_DISTRACTED_WAV") or "alarm_distracted.wav").strip(),
+        drowsy_wav=(os.getenv("EDGE_ALARM_DROWSY_WAV") or "canhBaoBuonNgu.mp3").strip(),
+        distracted_wav=(os.getenv("EDGE_ALARM_DISTRACTED_WAV") or "canhBaoMatTapTrung.mp3").strip(),
         volume=alarm_volume,
     )
     audio_alarm.start()

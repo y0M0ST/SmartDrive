@@ -16,6 +16,7 @@ import tripTrackingRoutes from './trip-tracking/trip-tracking.route';
 import violationsInboxRoutes from './violations-inbox/violations-inbox.route';
 import driverScoreRoutes from './driver-scores/driver-score.route';
 import reportRoutes from './reports/reports.route';
+import platformOverviewRoutes from './platform-overview/platform-overview.route';
 
 const router = Router();
 router.use('/auth', authRoutes);
@@ -26,6 +27,7 @@ router.use('/trips', tripTrackingRoutes);
 router.use('/violations', violationsInboxRoutes);
 router.use('/scores', driverScoreRoutes);
 router.use('/reports', reportRoutes);
+router.use('/platform', platformOverviewRoutes);
 router.use('/agencies/violations', violationRoutes);
 router.use('/agencies/trips', tripRoutes);
 router.use('/agencies', agencyRoutes);

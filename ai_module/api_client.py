@@ -185,7 +185,7 @@ def send_gps_point(
         return False
 
 
-def send_violation_json(
+def send_violation_json_detailed(
     trip_id: str,
     violation_type: str,
     *,
@@ -203,30 +203,30 @@ def send_violation_json(
     Phải cung cấp đúng một trong hai: `image_base64` hoặc `image_url`.
 
     :param device_api_key: Ghi đè `MASTER_DEVICE_API_KEY` (ví dụ từ `smartdrive_edge_ai` sau `load_dotenv`).
-    :return: True nếu HTTP 2xx; False nếu lỗi (không ném exception ra ngoài).
+    :return: (ok, status_code, body_text) để caller quyết định retry/drop.
     """
     key = (device_api_key or "").strip() or (API_KEY or "").strip() or os.getenv("MASTER_DEVICE_API_KEY", "").strip()
     if not key:
         logger.warning(
             "MASTER_DEVICE_API_KEY chưa được cấu hình — bỏ qua gửi vi phạm JSON (thiếu header x-device-api-key).",
         )
-        return False
+        return False, None, ""
 
     tid = (trip_id or "").strip()
     if not tid:
         logger.warning("send_violation_json: trip_id rỗng.")
-        return False
+        return False, None, ""
 
     vt = (violation_type or "").strip().upper()
     if vt not in _ALLOWED_TYPES:
         logger.warning("send_violation_json: violation_type không hợp lệ: %r", violation_type)
-        return False
+        return False, None, ""
 
     b64 = (image_base64 or "").strip() or None
     url = (image_url or "").strip() or None
     if bool(b64) == bool(url):
         logger.warning("send_violation_json: cần đúng một trong image_base64 hoặc image_url.")
-        return False
+        return False, None, ""
 
     eid = (device_event_id or "").strip() or uuid.uuid4().hex
 
@@ -259,19 +259,46 @@ def send_violation_json(
             timeout=REQUEST_TIMEOUT_SEC,
         )
         if 200 <= resp.status_code < 300:
-            return True
+            return True, resp.status_code, (resp.text or "")
         logger.warning(
             "Ingest vi phạm JSON HTTP %s: %s",
             resp.status_code,
             (resp.text or "")[:500],
         )
-        return False
+        return False, resp.status_code, (resp.text or "")
     except requests.Timeout:
         logger.warning("Ingest vi phạm JSON timeout sau %ss.", REQUEST_TIMEOUT_SEC)
-        return False
+        return False, None, ""
     except requests.RequestException as e:
         logger.warning("Ingest vi phạm JSON lỗi mạng: %s", e)
-        return False
+        return False, None, ""
     except Exception as e:  # noqa: BLE001
         logger.exception("Ingest vi phạm JSON lỗi không mong đợi: %s", e)
-        return False
+        return False, None, ""
+
+
+def send_violation_json(
+    trip_id: str,
+    violation_type: str,
+    *,
+    image_base64: Optional[str] = None,
+    image_url: Optional[str] = None,
+    device_event_id: Optional[str] = None,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    occurred_at_iso: Optional[str] = None,
+    device_api_key: Optional[str] = None,
+) -> bool:
+    """Backward-compatible wrapper: chỉ trả về thành công/thất bại."""
+    ok, _status, _body = send_violation_json_detailed(
+        trip_id,
+        violation_type,
+        image_base64=image_base64,
+        image_url=image_url,
+        device_event_id=device_event_id,
+        lat=lat,
+        lng=lng,
+        occurred_at_iso=occurred_at_iso,
+        device_api_key=device_api_key,
+    )
+    return ok
