@@ -36,7 +36,7 @@ const SUPER_MENU_ITEMS = [
   { icon: Icons.LayoutDashboard, label: "Tổng quan hệ thống", path: "/admin/super/overview" },
   { icon: Icons.UserCog, label: "Quản lý tài khoản", path: "/admin/accounts" },
   { icon: Icons.Building2, label: "Quản lý đại lý", path: "/admin/super/agencies" },
-  { icon: Icons.Package, label: "Gói cước (demo)", path: "/admin/super/plans" },
+  { icon: Icons.Package, label: "Gói cước", path: "/admin/super/plans" },
   { icon: Icons.ScrollText, label: "Nhật ký hệ thống", path: "/admin/super/logs" },
 ];
 

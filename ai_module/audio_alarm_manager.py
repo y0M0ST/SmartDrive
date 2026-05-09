@@ -4,7 +4,7 @@ US_19 — Phát cảnh báo âm thanh tại chỗ (WAV) không chặn vòng lặ
 - `pygame.mixer` chạy trên **thread daemon riêng**; main thread chỉ gọi `set_alarm(kind)`.
 - `set_alarm(None)` → `pygame.mixer.stop()` — âm thanh tắt ngay khi tài xế về trạng thái bình thường.
 - Thiếu file hoặc lỗi load: **Warning**, không ném exception ra main.
-- Cùng tên gốc: nếu không thấy đúng `EDGE_ALARM_*_WAV`, tự thử `.{wav,mp3,ogg}` (vd. chỉ có `alarm_drowsy.mp3`).
+- Cùng tên gốc: nếu không thấy đúng `EDGE_ALARM_*_WAV`, tự thử `.{wav,mp3,ogg}` (vd. chỉ có `canhBaoBuonNgu.mp3`).
 - `volume` 0.0–1.0 (pygame `Sound.set_volume`) — cấu hình từ biến môi trường phía caller.
 """
 
@@ -50,8 +50,8 @@ class AudioAlarmManager:
         base_dir: Path,
         stop_event: threading.Event,
         *,
-        drowsy_wav: str = "alarm_drowsy.wav",
-        distracted_wav: str = "alarm_distracted.wav",
+        drowsy_wav: str = "canhBaoBuonNgu.mp3",
+        distracted_wav: str = "canhBaoMatTapTrung.mp3",
         volume: float = 1.0,
     ) -> None:
         self._base = base_dir
