@@ -1,12 +1,4 @@
 {
-  "compilerOptions": {
-      "paths": {
-      "@/*": ["./src/*"]
-    },
-    "noEmit": true
-  },
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "extends": "./tsconfig.app.json",
+  "include": ["src"]
 }

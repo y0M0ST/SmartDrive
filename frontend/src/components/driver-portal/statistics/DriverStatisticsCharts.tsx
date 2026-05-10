@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -27,6 +27,17 @@ export type DriverStatisticsChartsProps = {
 
 function safeRows<T>(rows: T[] | null | undefined): T[] {
   return Array.isArray(rows) ? rows : [];
+}
+
+function tooltipNumericValue(value: number | string | ReadonlyArray<number | string> | undefined): number {
+  if (value == null) return 0;
+  if (Array.isArray(value)) {
+    const first = value[0];
+    const n = typeof first === "number" ? first : Number(first);
+    return Number.isFinite(n) ? n : 0;
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
 export function DriverStatisticsCharts({ safetyRows, incomeRows, className }: DriverStatisticsChartsProps) {
@@ -60,8 +71,13 @@ export function DriverStatisticsCharts({ safetyRows, incomeRows, className }: Dr
           Điểm an toàn theo tuần
         </h2>
         <p className="text-xs text-muted-foreground">Điểm = max(0, 100 − điểm trừ vi phạm trong tuần).</p>
-        <div className="h-[300px] w-full min-w-0 max-w-full">
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="h-[300px] w-full min-w-0 max-w-full min-h-[300px]">
+          <ResponsiveContainer
+            width="100%"
+            height={300}
+            minWidth={0}
+            initialDimension={{ width: 480, height: 300 }}
+          >
             <LineChart data={safety} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/80" />
               <XAxis
@@ -78,11 +94,12 @@ export function DriverStatisticsCharts({ safetyRows, incomeRows, className }: Dr
                   fontSize: 12,
                   maxWidth: "min(280px, 92vw)",
                 }}
-                formatter={(value: number | string) => [`${value} điểm`, "Điểm"]}
+                formatter={(value) => {
+                  const n = tooltipNumericValue(value);
+                  return [`${n} điểm`, "Điểm"] as [ReactNode, string];
+                }}
                 labelFormatter={(_label, payload) => {
-                  const row = (payload as unknown[] | undefined)?.[0]?.payload as
-                    | DriverStatisticsSafetyWeek
-                    | undefined;
+                  const row = payload[0]?.payload as DriverStatisticsSafetyWeek | undefined;
                   return row?.label ?? "";
                 }}
               />
@@ -97,8 +114,13 @@ export function DriverStatisticsCharts({ safetyRows, incomeRows, className }: Dr
           Thu nhập dự kiến theo tuần
         </h2>
         <p className="text-xs text-muted-foreground">Theo công thức nhà xe (lương cứng chia tuần + thưởng chuyến − phạt điểm).</p>
-        <div className="h-[300px] w-full min-w-0 max-w-full">
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="h-[300px] w-full min-w-0 max-w-full min-h-[300px]">
+          <ResponsiveContainer
+            width="100%"
+            height={300}
+            minWidth={0}
+            initialDimension={{ width: 480, height: 300 }}
+          >
             <BarChart data={income} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/80" vertical={false} />
               <XAxis
@@ -125,11 +147,12 @@ export function DriverStatisticsCharts({ safetyRows, incomeRows, className }: Dr
                   fontSize: 12,
                   maxWidth: "min(280px, 92vw)",
                 }}
-                formatter={(value: number | string) => [VND_TOOLTIP.format(Number(value)), "Thu nhập"]}
+                formatter={(value) => {
+                  const n = tooltipNumericValue(value);
+                  return [VND_TOOLTIP.format(n), "Thu nhập"] as [ReactNode, string];
+                }}
                 labelFormatter={(_label, payload) => {
-                  const row = (payload as unknown[] | undefined)?.[0]?.payload as
-                    | DriverStatisticsIncomeWeek
-                    | undefined;
+                  const row = payload[0]?.payload as DriverStatisticsIncomeWeek | undefined;
                   return row?.label ?? "";
                 }}
               />

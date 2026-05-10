@@ -24,8 +24,8 @@ import AdminProfilePage from "./pages/profiles/AdminProfilePage";
 import DriverManagement from "./pages/DriverManagement";
 import AccountManagementPage from "./pages/accounts/AccountManagementPage";
 import VehicleManagement from "./pages/VehicleManagement";
+import AgencyOperationsDashboardPage from "./pages/agency/AgencyOperationsDashboardPage";
 import AgencyDashboardPage from "./pages/agency/AgencyDashboardPage";
-import AgencyPlaceholderPage from "./pages/agency/AgencyPlaceholderPage";
 import AgencyDriverLeaderboardPage from "./pages/agency/AgencyDriverLeaderboardPage";
 import AgencyFleetTrackingPage from "./pages/agency/AgencyFleetTrackingPage";
 import TripListPage from "./pages/trips/TripListPage";
@@ -194,7 +194,7 @@ function App() {
               </Route>
 
               <Route element={<AgencyShell />}>
-                <Route path="dashboard" element={<AgencyDashboardPage />} />
+                <Route path="dashboard" element={<AgencyOperationsDashboardPage />} />
                 <Route path="routes" element={<RouteListPage />} />
                 <Route path="drivers" element={<DriverManagement />} />
                 <Route path="vehicles" element={<VehicleManagement />} />
@@ -202,10 +202,7 @@ function App() {
                 <Route path="fleet" element={<AgencyFleetTrackingPage />} />
                 <Route path="violations" element={<ViolationListPage />} />
                 <Route path="ratings" element={<AgencyDriverLeaderboardPage />} />
-                <Route
-                  path="finance"
-                  element={<AgencyPlaceholderPage title="Thống kê thu nhập & báo cáo" />}
-                />
+                <Route path="finance" element={<AgencyDashboardPage />} />
               </Route>
             </Route>
 
