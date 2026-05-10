@@ -96,7 +96,12 @@ export const updateVehicle = async (agencyId: string, vehicleId: string, input: 
     // Check trùng Camera
     if (normalizedCameraId) {
         const existCam = await vehicleRepo.findOneBy({ agency_id: agencyId, ai_camera_id: normalizedCameraId, id: Not(vehicleId) });
-        if (existCam) throw new AppError(`Mã Camera này đang được gắn cho xe ${existCam.license_plate}!`, 409);
+        if (existCam) {
+            throw new AppError(
+                `Mã Camera ${normalizedCameraId} đang được gắn cho xe ${existCam.license_plate}. Vui lòng gỡ liên kết trước!`,
+                409,
+            );
+        }
     }
 
     Object.assign(vehicle, {

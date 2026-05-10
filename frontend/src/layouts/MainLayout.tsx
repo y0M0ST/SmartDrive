@@ -13,17 +13,18 @@ import {
   readStoredUserRole,
   readStoredUserFullName,
 } from "@/lib/adminAccess";
+import { AgencySocketProvider } from "@/contexts/AgencySocketContext";
+import { AgencyViolationBell } from "@/components/agency/AgencyViolationBell";
+import { LogoutConfirmControl } from "@/components/auth/LogoutConfirmControl";
 
 /** Menu vận hành nhà xe — Super Admin không thấy các mục này. */
 const AGENCY_MENU_ITEMS = [
   { icon: Icons.LayoutDashboard, label: "Dashboard nhà xe", path: "/admin/dashboard" },
-  {
-    icon: Icons.Users,
-    label: "Tài xế & tài khoản",
-    path: "/admin/drivers",
-  },
+  { icon: Icons.Users, label: "Danh sách tài xế", path: "/admin/drivers" },
+  { icon: Icons.UserCog, label: "Quản lý tài khoản", path: "/admin/accounts" },
   { icon: Icons.Clipboard, label: "Quản lí tuyến đường", path: "/admin/routes" },
   { icon: Icons.Calendar, label: "Quản lí chuyến đi", path: "/admin/trips" },
+  { icon: Icons.MapPin, label: "Giám sát hành trình", path: "/admin/fleet" },
   { icon: Icons.Monitor, label: "Lịch sử vi phạm", path: "/admin/violations" },
   { icon: Icons.History, label: "Đánh giá và xếp hạng", path: "/admin/ratings" },
   { icon: Icons.MessageSquare, label: "Thống kê thu nhập & báo cáo", path: "/admin/finance" },
@@ -33,8 +34,9 @@ const AGENCY_MENU_ITEMS = [
 /** Trung tâm Super Admin — tách khỏi UI đại lý. */
 const SUPER_MENU_ITEMS = [
   { icon: Icons.LayoutDashboard, label: "Tổng quan hệ thống", path: "/admin/super/overview" },
+  { icon: Icons.UserCog, label: "Quản lý tài khoản", path: "/admin/accounts" },
   { icon: Icons.Building2, label: "Quản lý đại lý", path: "/admin/super/agencies" },
-  { icon: Icons.Package, label: "Gói cước (demo)", path: "/admin/super/plans" },
+  { icon: Icons.Package, label: "Gói cước", path: "/admin/super/plans" },
   { icon: Icons.ScrollText, label: "Nhật ký hệ thống", path: "/admin/super/logs" },
 ];
 
@@ -57,7 +59,8 @@ export default function MainLayout() {
   const isDark = (theme === "system" ? resolvedTheme : theme) === "dark";
 
   return (
-    // THẺ CHA: Ép màu nền tối nhất cho toàn trang
+    <AgencySocketProvider>
+    {/* THẺ CHA: Ép màu nền tối nhất cho toàn trang */}
     <div className="flex min-h-screen bg-background text-foreground antialiased transition-colors duration-300">
       
       {/* SIDEBAR: Đổi bg-white -> dark:bg-slate-900 */}
@@ -69,7 +72,9 @@ export default function MainLayout() {
 
         <nav className="flex-1 space-y-1 overflow-y-auto pr-2 custom-scrollbar">
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive =
+              location.pathname === item.path ||
+              (item.path === "/admin/drivers" && location.pathname.startsWith("/admin/drivers"));
             return (
               <Link
                 key={item.path}
@@ -122,33 +127,26 @@ export default function MainLayout() {
               
               {/* NÚT GẠT THEME */}
               <button
-  type="button"
-  onClick={() => setTheme(isDark ? "light" : "dark")}
-  className={`relative h-5 w-10 rounded-full transition-colors duration-300 ${
-    isDark ? "bg-blue-600" : "bg-slate-300"
-  }`}
-  aria-label="Toggle theme"
->
-  <span
-    className={`absolute top-1 size-3 rounded-full bg-white transition-transform duration-300 ${
-      isDark ? "translate-x-6" : "translate-x-1"
-    }`}
-  />
-</button>
+                type="button"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                className={`relative h-6 w-11 rounded-full p-0.5 transition-colors duration-300 ${
+                  isDark ? "bg-blue-600" : "bg-slate-300"
+                }`}
+                aria-label="Toggle theme"
+              >
+                <span
+                  className={`block size-5 rounded-full bg-white shadow-sm transition-transform duration-300 ${
+                    isDark ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
 
               <Icons.Mail
                 size={20}
                 className="cursor-pointer text-muted-foreground transition-colors hover:text-primary"
                 aria-hidden
               />
-              <div className="relative">
-                <Icons.Bell
-                  size={20}
-                  className="cursor-pointer text-muted-foreground transition-colors hover:text-primary"
-                  aria-hidden
-                />
-                <span className="absolute -right-1 -top-1 size-2 rounded-full border-2 border-card bg-red-500" />
-              </div>
+              <AgencyViolationBell />
             </div>
 
             <DropdownMenu>
@@ -178,16 +176,10 @@ export default function MainLayout() {
                   </DropdownMenuItem>
                 </Link>
                 <div className="mx-2 my-1 h-px bg-border" />
-                <DropdownMenuItem
-                  onClick={() => {
-                    localStorage.clear();
-                    window.location.replace("/login");
-                  }}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
-                >
+                <LogoutConfirmControl variant="dropdown-item">
                   <Icons.LogOut size={18} />
                   <span className="text-sm font-bold">Đăng xuất</span>
-                </DropdownMenuItem>
+                </LogoutConfirmControl>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -199,5 +191,6 @@ export default function MainLayout() {
         </div>
       </main>
     </div>
+    </AgencySocketProvider>
   );
 }

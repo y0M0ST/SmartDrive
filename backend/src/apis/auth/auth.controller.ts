@@ -34,7 +34,6 @@ export const logoutController = catchAsync(async (req: Request, res: Response) =
 });
 
 export const changePasswordController = catchAsync(async (req: Request, res: Response) => {
-    // GIẢ ĐỊNH: Bồ đã có authMiddleware gắn thông tin giải mã JWT vào req.user
     const userId = userIdFromReq(req);
 
     await authService.changePassword(userId, req.body);
@@ -63,8 +62,20 @@ export const verifyContactChangeController = catchAsync(async (req: Request, res
 });
 
 export const forgotPasswordController = catchAsync(async (req: Request, res: Response) => {
-    // Dù email sai hay đúng, mình vẫn trả về 1 câu chung chung để chống Hacker dò email hệ thống
-    res.status(200).json(ServiceResponse.success('Nếu email hợp lệ, hệ thống đã gửi đường dẫn khôi phục. Vui lòng kiểm tra hộp thư.'));
+    try {
+        await authService.forgotPassword(req.body);
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : '';
+        // Không lộ email có tồn tại hay không (chống dò email)
+        if (!/không tồn tại|Quản trị viên/i.test(msg)) {
+            throw error;
+        }
+    }
+    res.status(200).json(
+        ServiceResponse.success(
+            'Nếu email hợp lệ, hệ thống đã gửi đường dẫn khôi phục. Vui lòng kiểm tra hộp thư.',
+        ),
+    );
 });
 
 export const resetPasswordController = catchAsync(async (req: Request, res: Response) => {

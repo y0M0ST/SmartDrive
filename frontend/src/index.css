@@ -65,3 +65,14 @@
       color 0.2s ease;
   }
 }
+
+/* US_09 — Leaflet: container cần chiều cao rõ ràng */
+.fleet-map-container {
+  min-height: 480px;
+  height: 100%;
+}
+.fleet-map-container .leaflet-container {
+  height: 100%;
+  width: 100%;
+  font-family: inherit;
+}

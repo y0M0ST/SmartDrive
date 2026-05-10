@@ -8,11 +8,17 @@ const idCardSchema = z
     .string()
     .regex(/^\d{9,12}$/, 'So CMND/CCCD phai gom 9-12 chu so');
 
-const licenseExpiresSchema = z.coerce
-    .date()
-    .refine((date) => date > new Date(), {
-        message: 'Ngay het han bang lai khong duoc nam trong qua khu',
-    });
+/** So sánh theo ngày (lịch), cho phép hết hạn vào hôm nay; chỉ từ chối các ngày trước hôm nay. */
+function startOfLocalDay(d: Date): number {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+const licenseExpiresSchema = z.coerce.date().refine(
+    (date) => startOfLocalDay(date) >= startOfLocalDay(new Date()),
+    {
+        message: 'Ngày hết hạn bằng lái không được là ngày trong quá khứ.',
+    },
+);
 
 export const createProfileSchema = z.object({
     params: z.object({}).optional(),

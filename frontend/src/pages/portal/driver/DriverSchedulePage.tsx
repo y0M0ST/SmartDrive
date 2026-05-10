@@ -37,11 +37,11 @@ function EmptyTrips() {
   return (
     <div className="flex w-full min-w-0 flex-col items-center justify-center px-4 py-16 text-center">
       <CalendarX className="mb-4 size-12 text-slate-300 dark:text-slate-600" strokeWidth={1.25} aria-hidden />
-      <p className="text-[13px] font-medium tracking-tight text-slate-400 dark:text-slate-500">
-        Chưa có lịch
+      <p className="text-[13px] font-semibold tracking-tight text-slate-600 dark:text-slate-400">
+        Chưa có lịch được phân công
       </p>
-      <p className="mt-1.5 max-w-[240px] text-xs leading-relaxed text-slate-400/90 dark:text-slate-500">
-        Hiện tại bác tài chưa có lịch chạy. Hãy nghỉ ngơi nhé!
+      <p className="mt-1.5 max-w-[280px] text-xs leading-relaxed text-slate-400/90 dark:text-slate-500">
+        Khi nhà xe xếp chuyến, lịch sẽ hiển thị ở đây. Hãy nghỉ ngơi hoặc liên hệ điều hành nếu bạn đang chờ lịch.
       </p>
     </div>
   );
@@ -263,7 +263,9 @@ export default function DriverSchedulePage() {
           ) : upcoming.length === 0 ? (
             <EmptyTrips />
           ) : (
-            upcoming.map((t) => <DriverTripCard key={t.id} trip={t} onOpen={openDetail} />)
+            upcoming.map((t) => (
+              <DriverTripCard key={t.id} trip={t} resolveProvinceName={resolveProvinceName} onOpen={openDetail} />
+            ))
           )}
         </TabsContent>
 
@@ -273,7 +275,9 @@ export default function DriverSchedulePage() {
           ) : history.length === 0 ? (
             <EmptyTrips />
           ) : (
-            history.map((t) => <DriverTripCard key={t.id} trip={t} onOpen={openDetail} />)
+            history.map((t) => (
+              <DriverTripCard key={t.id} trip={t} resolveProvinceName={resolveProvinceName} onOpen={openDetail} />
+            ))
           )}
         </TabsContent>
       </Tabs>

@@ -1,12 +1,40 @@
 import { AppDataSource } from '../../config/data-source';
 import { Trip } from '../../entities/trip.entity';
+import { AiViolation } from '../../entities/ai-violation.entity';
 import { DriverProfile } from '../../entities/driver-profile.entity';
 import { TripCheckin } from '../../entities/trip-checkin.entity';
 import { CheckinResult, TripStatus } from '../../common/constants/enums';
+import { vnMonthRangeFromYearMonth } from '../../common/utils/vn-timezone';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
-import type { GetMyTripsQuery, SaveFaceTemplateBody, TripCheckinBody } from './driver-portal.dto';
+import type {
+    DriverViolationsQuery,
+    GetMyTripsQuery,
+    SaveFaceTemplateBody,
+    TripCheckinBody,
+} from './driver-portal.dto';
 
 const FACE_ENCODING_DIM = 128;
+
+/** Đồng bộ `FACE_MATCH_THRESHOLD` (frontend faceAuth) — `distance >=` ngưỡng → FACE_MISMATCH 400. */
+const FACE_MATCH_DISTANCE_THRESHOLD = 0.5;
+
+function faceEuclideanDistance(a: number[], b: number[]): number {
+    if (a.length !== b.length || a.length !== FACE_ENCODING_DIM) {
+        throw new AppError('Vector khuôn mặt không hợp lệ.', 400);
+    }
+    let sum = 0;
+    for (let i = 0; i < a.length; i += 1) {
+        const d = a[i]! - b[i]!;
+        sum += d * d;
+    }
+    return Math.sqrt(sum);
+}
+
+/** Giống `faceDistanceToMatchScore` trên frontend (0–100, một chữ số thập phân). */
+function distanceToMatchScore(distance: number): number {
+    const d = Math.min(Math.max(distance, 0), 1);
+    return Math.round((1 - d) * 1000) / 10;
+}
 
 export type DriverPortalRouteDto = {
     id: string;
@@ -113,6 +141,72 @@ const getMyTripsImpl = async (driverUserId: string, query: GetMyTripsQuery) => {
     };
 };
 
+export type DriverViolationListItem = {
+    id: string;
+    type: string;
+    occurred_at: string;
+    image_url: string;
+    trip_code: string;
+    trip_id: string;
+    coordinates: {
+        latitude: number | null;
+        longitude: number | null;
+    };
+};
+
+/**
+ * US_16 — Vi phạm của chính tài xế (`driver_id` = JWT), trong tháng VN, có phân trang.
+ */
+const getMyViolationsImpl = async (driverUserId: string, query: DriverViolationsQuery) => {
+    const { month, tripCode, page, limit } = query;
+    const { from, to } = vnMonthRangeFromYearMonth(month);
+    const skip = (page - 1) * limit;
+
+    const vioRepo = AppDataSource.getRepository(AiViolation);
+    const qb = vioRepo
+        .createQueryBuilder('v')
+        .innerJoinAndSelect('v.trip', 't')
+        .where('v.driver_id = :driverUserId', { driverUserId })
+        .andWhere('t.driver_id = :driverUserId', { driverUserId })
+        .andWhere('v.occurred_at >= :from AND v.occurred_at <= :to', { from, to });
+
+    if (tripCode) {
+        qb.andWhere('t.trip_code = :tripCode', { tripCode });
+    }
+
+    const countQb = qb.clone();
+    const total = await countQb.getCount();
+
+    const rows = await qb
+        .orderBy('v.occurred_at', 'DESC')
+        .skip(skip)
+        .take(limit)
+        .getMany();
+
+    const data: DriverViolationListItem[] = rows.map((v) => ({
+        id: v.id,
+        type: v.type,
+        occurred_at: v.occurred_at.toISOString(),
+        image_url: v.image_url,
+        trip_code: v.trip.trip_code,
+        trip_id: v.trip_id,
+        coordinates: {
+            latitude: v.latitude ?? null,
+            longitude: v.longitude ?? null,
+        },
+    }));
+
+    return {
+        data,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: total > 0 ? Math.ceil(total / limit) : 0,
+        },
+    };
+};
+
 const assertFaceEncodingArray = (value: unknown): number[] => {
     if (!Array.isArray(value) || value.length !== FACE_ENCODING_DIM) {
         throw new AppError('Dữ liệu face_encoding trên hệ thống không hợp lệ.', 500);
@@ -149,6 +243,8 @@ const saveFaceTemplateImpl = async (driverUserId: string, body: SaveFaceTemplate
         throw new AppError(
             'Tài khoản điểm danh khuôn mặt của bạn đang bị khóa. Vui lòng liên hệ nhà xe / vận hành để mở khóa.',
             403,
+            undefined,
+            'FACE_TEMPLATE_LOCKED',
         );
     }
     profile.face_encoding = JSON.stringify(body.faceEncoding);
@@ -209,6 +305,22 @@ const checkinTripImpl = async (
     const { result, matchScore } = body;
 
     if (result === CheckinResult.SUCCESS) {
+        const storedEncoding = parseStoredFaceEncoding(profile.face_encoding);
+        if (!storedEncoding) {
+            throw new BadRequestException('Bạn chưa đăng ký mẫu khuôn mặt — không thể điểm danh bằng Face ID.');
+        }
+        const liveEncoding = assertFaceEncodingArray(body.faceEncoding);
+        const distance = faceEuclideanDistance(storedEncoding, liveEncoding);
+        if (distance >= FACE_MATCH_DISTANCE_THRESHOLD) {
+            throw new AppError(
+                'Khuôn mặt không khớp mẫu đã đăng ký (Face Mismatch). Vui lòng điểm danh bằng chính tài khoản đã đăng ký.',
+                400,
+                { distance: Math.round(distance * 1000) / 1000 },
+                'FACE_MISMATCH',
+            );
+        }
+        const verifiedMatchScore = distanceToMatchScore(distance);
+
         await AppDataSource.transaction(async (manager) => {
             const tRepo = manager.getRepository(Trip);
             const cRepo = manager.getRepository(TripCheckin);
@@ -220,7 +332,7 @@ const checkinTripImpl = async (
                     trip_id: trip.id,
                     driver_id: driverUserId,
                     device_id: null,
-                    match_score: matchScore,
+                    match_score: verifiedMatchScore,
                     result: CheckinResult.SUCCESS,
                 }),
             );
@@ -272,12 +384,14 @@ const checkinTripImpl = async (
 
 export const DriverPortalService = {
     getMyTrips: getMyTripsImpl,
+    getMyViolations: getMyViolationsImpl,
     saveFaceTemplate: saveFaceTemplateImpl,
     getFaceTemplate: getFaceTemplateImpl,
     checkinTrip: checkinTripImpl,
 };
 
 export const getMyTrips = DriverPortalService.getMyTrips;
+export const getMyViolations = DriverPortalService.getMyViolations;
 export const saveFaceTemplate = DriverPortalService.saveFaceTemplate;
 export const getFaceTemplate = DriverPortalService.getFaceTemplate;
 export const checkinTrip = DriverPortalService.checkinTrip;

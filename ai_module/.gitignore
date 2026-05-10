@@ -1,0 +1,5 @@
+# US_21 — ảnh chứng cứ chờ sync (không commit)
+cache/
+
+# SQLite queue local (tùy chọn: có thể xóa dòng này nếu muốn commit DB mẫu)
+database/violation_queue.db

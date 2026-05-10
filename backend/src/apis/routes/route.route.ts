@@ -12,58 +12,66 @@ import {
 
 const router = Router();
 
-router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN', 'COORDINATOR']));
+router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN']));
 
 /**
  * @swagger
  * tags:
  *   - name: Routes
- *     description: Quan ly danh muc tuyen duong
+ *     description: Danh mục tuyến đường (SUPER_ADMIN, AGENCY_ADMIN)
  */
 
 /**
  * @swagger
  * /api/routes:
  *   get:
- *     summary: Lay danh sach tuyen duong
+ *     summary: Danh sách tuyến (phân trang, tìm kiếm, lọc trạng thái)
+ *     description: Query theo `getRouteQuerySchema` (page, limit, search, status).
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
+ *         required: false
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Trang hien tai
+ *         description: Trang hiện tại
  *       - in: query
  *         name: limit
+ *         required: false
  *         schema:
  *           type: integer
  *           default: 10
- *         description: So luong ban ghi moi trang
+ *         description: Số bản ghi mỗi trang
  *       - in: query
  *         name: search
+ *         required: false
  *         schema:
  *           type: string
- *         description: Tim kiem theo ten tuyen
+ *         description: Tìm theo tên tuyến
  *       - in: query
  *         name: status
+ *         required: false
  *         schema:
  *           type: string
  *           enum: [ACTIVE, SUSPENDED]
- *         description: Loc theo trang thai tuyen
+ *         description: Lọc theo trạng thái
  *     responses:
  *       200:
- *         description: Lay danh sach thanh cong
+ *         description: Thành công
  *       400:
- *         description: Query khong hop le
+ *         description: Query không hợp lệ
  *       401:
- *         description: Chua dang nhap hoac token khong hop le
+ *         description: Chưa đăng nhập hoặc token không hợp lệ
  *       403:
- *         description: Khong co quyen truy cap
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Lỗi máy chủ
  *   post:
- *     summary: Tao tuyen duong moi
+ *     summary: Tạo tuyến mới
+ *     description: Body khớp `createRouteSchema` — mã điểm đầu/cuối lấy từ `GET /api/provinces`.
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
@@ -85,11 +93,11 @@ router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN', 'COORDINA
  *                 example: Da Nang - Hue
  *               start_point:
  *                 type: string
- *                 description: Ma tinh thanh (GET /api/provinces)
+ *                 description: Mã tỉnh/thành (GET /api/provinces)
  *                 example: DA_NANG
  *               end_point:
  *                 type: string
- *                 description: Ma tinh thanh (GET /api/provinces)
+ *                 description: Mã tỉnh/thành (GET /api/provinces)
  *                 example: THUA_THIEN_HUE
  *               distance_km:
  *                 type: number
@@ -99,13 +107,17 @@ router.use(authMiddleware, requireRole(['SUPER_ADMIN', 'AGENCY_ADMIN', 'COORDINA
  *                 example: 2.5
  *     responses:
  *       201:
- *         description: Tao tuyen thanh cong
+ *         description: Tạo tuyến thành công
  *       400:
- *         description: Du lieu dau vao khong hop le
+ *         description: Dữ liệu đầu vào không hợp lệ
  *       401:
- *         description: Chua dang nhap hoac token khong hop le
+ *         description: Chưa đăng nhập hoặc token không hợp lệ
  *       403:
- *         description: Khong co quyen truy cap
+ *         description: Không có quyền truy cập
+ *       409:
+ *         description: Trùng tuyến hoặc xung đột (nếu có)
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.get('/', validate(getRouteQuerySchema), routeController.getRoutes);
 router.post('/', validate(createRouteSchema), routeController.createRoute);
@@ -114,7 +126,8 @@ router.post('/', validate(createRouteSchema), routeController.createRoute);
  * @swagger
  * /api/routes/{id}:
  *   put:
- *     summary: Cap nhat thong tin tuyen duong
+ *     summary: Cập nhật thông tin tuyến
+ *     description: Body khớp `updateRouteSchema` (các trường tùy chọn).
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
@@ -125,7 +138,7 @@ router.post('/', validate(createRouteSchema), routeController.createRoute);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: ID cua tuyen duong
+ *         description: UUID tuyến
  *     requestBody:
  *       required: true
  *       content:
@@ -150,17 +163,19 @@ router.post('/', validate(createRouteSchema), routeController.createRoute);
  *                 example: 2.3
  *     responses:
  *       200:
- *         description: Cap nhat thanh cong
+ *         description: Cập nhật thành công
  *       400:
- *         description: Du lieu khong hop le
+ *         description: Dữ liệu không hợp lệ
  *       401:
- *         description: Chua dang nhap hoac token khong hop le
+ *         description: Chưa đăng nhập hoặc token không hợp lệ
  *       403:
- *         description: Khong co quyen truy cap
+ *         description: Không có quyền truy cập
  *       404:
- *         description: Khong tim thay tuyen duong
+ *         description: Không tìm thấy tuyến
+ *       500:
+ *         description: Lỗi máy chủ
  *   delete:
- *     summary: Xoa mem tuyen duong
+ *     summary: Xóa mềm tuyến
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
@@ -171,18 +186,20 @@ router.post('/', validate(createRouteSchema), routeController.createRoute);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: ID cua tuyen duong
+ *         description: UUID tuyến
  *     responses:
  *       200:
- *         description: Xoa mem thanh cong
+ *         description: Xóa mềm thành công
  *       400:
- *         description: Khong the xoa vi dang co chuyen di chua chay hoac dang chay
+ *         description: Không thể xóa vì còn chuyến chưa chạy hoặc đang chạy
  *       401:
- *         description: Chua dang nhap hoac token khong hop le
+ *         description: Chưa đăng nhập hoặc token không hợp lệ
  *       403:
- *         description: Khong co quyen truy cap
+ *         description: Không có quyền truy cập
  *       404:
- *         description: Khong tim thay tuyen duong
+ *         description: Không tìm thấy tuyến
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.put('/:id', validate(routeIdParamSchema.merge(updateRouteSchema)), routeController.updateRoute);
 router.delete('/:id', validate(routeIdParamSchema), routeController.deleteRoute);
@@ -191,7 +208,8 @@ router.delete('/:id', validate(routeIdParamSchema), routeController.deleteRoute)
  * @swagger
  * /api/routes/{id}/status:
  *   patch:
- *     summary: Cap nhat trang thai tuyen duong
+ *     summary: Đổi trạng thái tuyến (ACTIVE / SUSPENDED)
+ *     description: Body khớp `changeRouteStatusSchema`.
  *     tags: [Routes]
  *     security:
  *       - bearerAuth: []
@@ -202,7 +220,7 @@ router.delete('/:id', validate(routeIdParamSchema), routeController.deleteRoute)
  *         schema:
  *           type: string
  *           format: uuid
- *         description: ID cua tuyen duong
+ *         description: UUID tuyến
  *     requestBody:
  *       required: true
  *       content:
@@ -218,15 +236,17 @@ router.delete('/:id', validate(routeIdParamSchema), routeController.deleteRoute)
  *                 example: SUSPENDED
  *     responses:
  *       200:
- *         description: Doi trang thai thanh cong
+ *         description: Đổi trạng thái thành công
  *       400:
- *         description: Trang thai khong hop le
+ *         description: Trạng thái không hợp lệ
  *       401:
- *         description: Chua dang nhap hoac token khong hop le
+ *         description: Chưa đăng nhập hoặc token không hợp lệ
  *       403:
- *         description: Khong co quyen truy cap
+ *         description: Không có quyền truy cập
  *       404:
- *         description: Khong tim thay tuyen duong
+ *         description: Không tìm thấy tuyến
+ *       500:
+ *         description: Lỗi máy chủ
  */
 router.patch('/:id/status', validate(routeIdParamSchema.merge(changeRouteStatusSchema)), routeController.changeStatus);
 

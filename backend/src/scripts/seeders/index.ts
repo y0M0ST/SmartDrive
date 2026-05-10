@@ -1,13 +1,18 @@
 import { seedAgencies } from './agency.seeder';
 import { seedPermissions } from './permission.seeder';
 import { seedRolePermissions } from './role-permission.seeder';
-import { seedRoles } from './role.seeder';
+import { migrateAndRemoveObsoleteRoles, seedRoles } from './role.seeder';
 import { seedUsers } from './user.seeder';
+import { seedViolationConfigs } from './violation-config.seeder';
+import { seedSalaryConfigs } from './salary-config.seeder';
 
 export async function runAllSeeders(): Promise<void> {
     await seedRoles();
+    await migrateAndRemoveObsoleteRoles();
     await seedPermissions();
     await seedRolePermissions();
     await seedAgencies();
     await seedUsers();
+    await seedViolationConfigs();
+    await seedSalaryConfigs();
 }

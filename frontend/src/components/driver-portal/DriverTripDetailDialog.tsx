@@ -92,8 +92,11 @@ export function DriverTripDetailDialog({
           </section>
 
           <section className="rounded-xl border border-border bg-muted/40 p-3">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nhà xe</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nhà xe / Đại lý</h4>
             <p className="mt-1 font-semibold text-foreground">{trip.agency.name}</p>
+            {trip.agency.code ? (
+              <p className="text-xs text-muted-foreground">Mã: {trip.agency.code}</p>
+            ) : null}
             {trip.agency.address ? (
               <p className="mt-1 text-xs text-muted-foreground">{trip.agency.address}</p>
             ) : null}
@@ -106,12 +109,25 @@ export function DriverTripDetailDialog({
 
           <section className="rounded-xl border border-border p-3 text-xs text-muted-foreground">
             <p>
-              <span className="font-semibold text-foreground">Xuất bến:</span> {formatIso(trip.departure_time)}
+              <span className="font-semibold text-foreground">Xuất bến (dự kiến):</span>{" "}
+              {formatIso(trip.departure_time)}
             </p>
+            {trip.actual_start_time ? (
+              <p className="mt-1">
+                <span className="font-semibold text-foreground">Xuất bến (thực tế):</span>{" "}
+                {formatIso(trip.actual_start_time)}
+              </p>
+            ) : null}
             <p className="mt-1">
-              <span className="font-semibold text-foreground">Dự kiến tới bến:</span>{" "}
+              <span className="font-semibold text-foreground">Tới bến (dự kiến):</span>{" "}
               {formatIso(trip.planned_end_time)}
             </p>
+            {trip.actual_end_time ? (
+              <p className="mt-1">
+                <span className="font-semibold text-foreground">Tới bến (thực tế):</span>{" "}
+                {formatIso(trip.actual_end_time)}
+              </p>
+            ) : null}
             {trip.cancel_reason ? (
               <p className="mt-2 text-rose-600 dark:text-rose-400">Lý do hủy: {trip.cancel_reason}</p>
             ) : null}

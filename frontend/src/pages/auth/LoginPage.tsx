@@ -14,12 +14,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import AuthLayout from "@/components/ui/layout/AuthLayout";
 import api from "@/services/api";
 import { canAccessAdminDashboard, getAdminHomePath } from "@/lib/adminAccess";
+import { clearClientAuth } from "@/lib/performLogout";
 
 // 1. Chỉ validate email + password. Không gắn rememberMe vào RHF — Radix Checkbox + register()
 //    gây giá trị sai → Zod fail im lặng (handleSubmit không gọi onSubmit, không có toast).
 const loginSchema = z.object({
-  email: z.string().min(1, "Vui lòng nhập đầy đủ Tên đăng nhập và Mật khẩu").email("Email không hợp lệ"),
-  password: z.string().min(1, "Vui lòng nhập đầy đủ Tên đăng nhập và Mật khẩu"),
+  email: z
+    .string()
+    .min(1, "Vui lòng nhập đầy đủ Email và Mật khẩu")
+    .email("Email không đúng định dạng"),
+  password: z.string().min(1, "Vui lòng nhập đầy đủ Email và Mật khẩu"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -31,9 +35,7 @@ export default function LoginPage() {
   useEffect(() => {
     /** Xóa phiên rồi ở lại trang đăng nhập (dev / đổi tài khoản test) */
     if (searchParams.get("logout") === "1") {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user_info");
+      clearClientAuth();
       navigate("/login", { replace: true });
       return;
     }
@@ -62,14 +64,10 @@ export default function LoginPage() {
           : "/portal/driver";
         navigate(dest, { replace: true });
       } else {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("user_info");
+        clearClientAuth();
       }
     } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user_info");
+      clearClientAuth();
     }
   }, [navigate, searchParams]);
 
@@ -84,7 +82,7 @@ export default function LoginPage() {
   });
 
   const onInvalid = () => {
-    toast.error("Vui lòng nhập đầy đủ Tên đăng nhập và Mật khẩu.");
+    toast.error("Vui lòng nhập đầy đủ Email và Mật khẩu");
   };
 
   // 3. Xử lý Logic Đăng nhập
@@ -115,6 +113,7 @@ export default function LoginPage() {
         localStorage.setItem("access_token", accessToken);
         localStorage.setItem("refresh_token", refreshToken || "");
         localStorage.setItem("user_info", JSON.stringify(user));
+        window.dispatchEvent(new Event("smartdrive:auth"));
 
         const role = user.role ?? "";
         const isAdmin = canAccessAdminDashboard(role);
@@ -147,9 +146,11 @@ export default function LoginPage() {
         } else if (
           status === 401 ||
           status === 404 ||
-          /Email hoặc mật khẩu không chính xác|không chính xác/i.test(msg)
+          /Tên đăng nhập hoặc mật khẩu không chính xác|Email hoặc mật khẩu không chính xác|không chính xác/i.test(
+            msg,
+          )
         ) {
-          toast.error("Tên đăng nhập hoặc mật khẩu không chính xác.");
+          toast.error("Tên đăng nhập hoặc mật khẩu không chính xác");
         } else {
           toast.error(msg || "Lỗi hệ thống, vui lòng thử lại sau!");
         }
@@ -169,12 +170,12 @@ export default function LoginPage() {
       >
         <div className="space-y-2">
           <Label htmlFor="email" className="font-semibold text-foreground">
-            Email đăng nhập
+            Email
           </Label>
           <Input
             id="email"
             type="email"
-            placeholder="Nhập địa chỉ email của bạn"
+            placeholder="Nhập email được hệ thống cấp"
             autoComplete="email"
             {...register("email")}
             className={`bg-white/50 focus:bg-white/80 transition-all ${errors.email ? "border-red-500" : ""}`}

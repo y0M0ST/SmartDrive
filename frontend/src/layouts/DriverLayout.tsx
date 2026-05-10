@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { CalendarDays, Bell, UserRound, LogOut } from "lucide-react";
+import { CalendarDays, ShieldAlert, BarChart3, Bell, UserRound, LogOut } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import {
@@ -10,9 +10,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { readStoredUserFullName } from "@/lib/adminAccess";
+import { LogoutConfirmControl } from "@/components/auth/LogoutConfirmControl";
 
 const NAV = [
   { to: "/portal/driver/schedule", label: "Lịch chạy", icon: CalendarDays },
+  { to: "/portal/driver/violations", label: "Vi phạm", icon: ShieldAlert },
+  { to: "/portal/driver/statistics", label: "Thống kê", icon: BarChart3 },
   { to: "/portal/driver/notifications", label: "Thông báo", icon: Bell },
   { to: "/portal/driver/me", label: "Cá nhân", icon: UserRound },
 ] as const;
@@ -92,17 +95,10 @@ export default function DriverLayout() {
         <div className="mt-auto rounded-2xl border border-border bg-muted/60 p-4">
           <p className="text-[11px] font-extrabold uppercase tracking-wider text-foreground">Tài xế</p>
           <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">Safe Drive · Cổng tài xế</p>
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.clear();
-              window.location.replace("/login");
-            }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background py-2 text-xs font-bold text-foreground transition hover:bg-muted"
-          >
+          <LogoutConfirmControl variant="sidebar-button">
             <LogOut size={16} />
             Đăng xuất
-          </button>
+          </LogoutConfirmControl>
         </div>
       </aside>
 
@@ -188,16 +184,10 @@ export default function DriverLayout() {
                     </DropdownMenuItem>
                   </Link>
                   <div className="mx-2 my-1 h-px bg-border" />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      localStorage.clear();
-                      window.location.replace("/login");
-                    }}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-red-600 outline-none hover:bg-red-50 focus:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
-                  >
+                  <LogoutConfirmControl variant="dropdown-item">
                     <LogOut size={18} />
                     <span className="text-sm font-bold">Đăng xuất</span>
-                  </DropdownMenuItem>
+                  </LogoutConfirmControl>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

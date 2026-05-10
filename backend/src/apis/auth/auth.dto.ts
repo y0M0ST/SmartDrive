@@ -5,7 +5,8 @@ export const loginSchema = z.object({
         email: z
             .string()
             .trim()
-            .email({ message: 'Email khong dung dinh dang' }),
+            .min(1, { message: 'Vui lòng nhập đầy đủ Email và Mật khẩu' })
+            .email({ message: 'Email không đúng định dạng' }),
         password: z.string().min(1, { message: 'Vui lòng nhập đầy đủ Email và Mật khẩu' }),
     }),
 });

@@ -51,6 +51,7 @@ interface UserItem {
   phone: string;
   status: UserStatus;
   agency_id: string | null;
+  agency?: { id: string; name: string } | null;
   role?: { id: string; name: string };
 }
 
@@ -85,12 +86,8 @@ function roleBadgeLabel(roleName?: string): string {
       return "Chủ hệ thống";
     case "AGENCY_ADMIN":
       return "Quản lý nhà xe";
-    case "DISPATCHER":
-      return "Điều phối";
     case "DRIVER":
       return "Tài xế";
-    case "VIEWER":
-      return "Người xem";
     default:
       return roleName || "—";
   }
@@ -106,18 +103,19 @@ function statusDisplay(status: UserStatus): { label: string; className: string }
       return {
         label: "Hoạt động",
         className:
-          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+          "border-green-200 bg-green-50 text-green-600 ring-1 ring-green-200 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400 dark:ring-green-800/60",
       };
     case "BLOCKED":
       return {
         label: "Đã khóa",
-        className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+        className:
+          "border-red-200 bg-red-100 text-red-700 ring-1 ring-red-200 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800/60",
       };
     case "INACTIVE":
       return {
         label: "Không hoạt động",
         className:
-          "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+          "border-amber-200 bg-amber-50 text-amber-600 ring-1 ring-amber-200 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400 dark:ring-amber-800/60",
       };
     default:
       return {
@@ -166,6 +164,7 @@ export default function AccountManagementPage() {
     phone: "",
     role_id: "",
     agency_id: "",
+    agency_name: "",
   });
 
   const rolesForForm = useMemo(() => {
@@ -272,6 +271,7 @@ export default function AccountManagementPage() {
       phone: "",
       role_id: defaultRole,
       agency_id: userAgencyId || "",
+      agency_name: "",
     });
     setIsDialogOpen(true);
   };
@@ -284,6 +284,7 @@ export default function AccountManagementPage() {
       phone: acc.phone || "",
       role_id: acc.role?.id || "",
       agency_id: acc.agency_id || userAgencyId || "",
+      agency_name: acc.agency?.name || "",
     });
     setIsDialogOpen(true);
   };
@@ -492,15 +493,17 @@ export default function AccountManagementPage() {
             Làm mới
           </Button>
 
-          <Button
-            type="button"
-            onClick={openCreateModal}
-            className="h-10 rounded-xl bg-blue-600 font-bold shadow-lg hover:bg-blue-700"
-            disabled={!roles.length && !rolesForForm.length}
-          >
-            <Icons.Plus className="mr-2 size-5" />
-            Thêm tài khoản mới
-          </Button>
+          {!isSuperAdmin && (
+            <Button
+              type="button"
+              onClick={openCreateModal}
+              className="h-10 rounded-xl bg-blue-600 font-bold shadow-lg hover:bg-blue-700"
+              disabled={!roles.length && !rolesForForm.length}
+            >
+              <Icons.Plus className="mr-2 size-5" />
+              Thêm tài khoản mới
+            </Button>
+          )}
         </div>
       </div>
 
@@ -508,8 +511,8 @@ export default function AccountManagementPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-muted/50 [&_tr]:border-border">
-                <TableRow className="border-border hover:bg-transparent">
+              <TableHeader className="bg-muted/50 [&_tr]:border-gray-200 dark:[&_tr]:border-gray-700">
+                <TableRow className="border-gray-200 hover:bg-transparent dark:border-gray-700">
                   <TableHead className="w-14 text-center font-bold">STT</TableHead>
                   <TableHead className="font-bold">Họ và tên</TableHead>
                   <TableHead className="font-bold">Email</TableHead>
@@ -545,7 +548,7 @@ export default function AccountManagementPage() {
                     return (
                       <TableRow
                         key={acc.id}
-                        className="border-border transition-colors hover:bg-muted/40"
+                        className="border-gray-200 transition-colors hover:bg-muted/40 dark:border-gray-700"
                       >
                         <TableCell className="text-center font-medium text-muted-foreground">
                           {stt}
@@ -559,7 +562,10 @@ export default function AccountManagementPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge className={`rounded-lg font-bold ${sd.className}`}>
+                          <Badge
+                            variant="outline"
+                            className={`h-6 rounded-full px-2.5 text-[12px] font-semibold ${sd.className}`}
+                          >
                             {sd.label}
                           </Badge>
                         </TableCell>
@@ -569,35 +575,42 @@ export default function AccountManagementPage() {
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/30 dark:hover:text-amber-300"
                               title="Chỉnh sửa"
                               onClick={() => handleEdit(acc)}
                             >
-                              <Icons.Pencil className="size-4 text-amber-500" />
+                              <Icons.Pencil className="size-4" />
                             </Button>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className={
+                                acc.status === "ACTIVE"
+                                  ? "text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                                  : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300"
+                              }
                               title={acc.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa"}
                               onClick={() => toggleStatus(acc)}
                             >
                               {acc.status === "ACTIVE" ? (
-                                <Icons.Lock className="size-4 text-red-500" />
+                                <Icons.Lock className="size-4" />
                               ) : (
-                                <Icons.Unlock className="size-4 text-green-500" />
+                                <Icons.Unlock className="size-4" />
                               )}
                             </Button>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
                               title="Xóa mềm"
                               onClick={() => {
                                 setAccountToDelete(acc);
                                 setIsDeleteConfirmOpen(true);
                               }}
                             >
-                              <Icons.Trash2 className="size-4 text-red-500" />
+                              <Icons.Trash2 className="size-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -729,7 +742,19 @@ export default function AccountManagementPage() {
                 </SelectContent>
               </Select>
             </div>
-            {isSuperAdmin && (
+            {editingAccount ? (
+              <div className="space-y-1">
+                <Label className="ml-1 text-sm font-bold text-foreground">
+                  Đại lý trực thuộc
+                </Label>
+                <Input
+                  value={formData.agency_name || "—"}
+                  readOnly
+                  disabled
+                  className="h-11 rounded-xl border-border bg-muted text-muted-foreground"
+                />
+              </div>
+            ) : isSuperAdmin ? (
               <div className="space-y-1">
                 <Label className="ml-1 text-sm font-bold text-foreground">
                   Agency ID (UUID) <span className="text-red-500">*</span>
@@ -741,7 +766,7 @@ export default function AccountManagementPage() {
                   placeholder="UUID nhà xe — bắt buộc khi tạo Quản lý nhà xe"
                 />
               </div>
-            )}
+            ) : null}
           </div>
 
           <DialogFooter className="flex items-center gap-3 p-6 pt-2">
@@ -775,8 +800,8 @@ export default function AccountManagementPage() {
               Xác nhận xóa tài khoản?
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Tài khoản <strong>{accountToDelete?.full_name}</strong> sẽ bị ẩn khỏi danh sách (xóa
-              mềm, dữ liệu lịch sử được giữ trên server). Bạn có chắc chắn?
+              Hành động này sẽ xóa tài khoản <strong>{accountToDelete?.full_name}</strong> khỏi hệ
+              thống. Bạn có chắc chắn muốn tiếp tục?
             </DialogDescription>
           </div>
           <div className="mt-6 flex gap-3">

@@ -20,9 +20,7 @@ type ActorContext = {
 const ROLES = {
     SUPER_ADMIN: 'SUPER_ADMIN',
     AGENCY_ADMIN: 'AGENCY_ADMIN',
-    DISPATCHER: 'DISPATCHER',
     DRIVER: 'DRIVER',
-    VIEWER: 'VIEWER',
 } as const;
 
 /** Agency Admin chỉ được tạo tài xế (role thấp hơn, vận hành thực tế). */
@@ -123,6 +121,7 @@ export const getUsers = async (query: GetUserQuery, actor: ActorContext) => {
     const qb = userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.role', 'role')
+        .leftJoinAndSelect('user.agency', 'agency')
         .select([
             'user.id',
             'user.full_name',
@@ -135,8 +134,12 @@ export const getUsers = async (query: GetUserQuery, actor: ActorContext) => {
             'role.id',
             'role.name',
             'role.description',
+            'agency.id',
+            'agency.name',
         ])
-        .where('1=1');
+        .where('1=1')
+        // Không cho phép admin nhìn thấy chính tài khoản đang đăng nhập trong danh sách quản lý.
+        .andWhere('user.id <> :actorId', { actorId: actor.id });
 
     if (actor.role === ROLES.AGENCY_ADMIN) {
         qb.andWhere('user.agency_id = :agencyId', { agencyId: actor.agency_id });
@@ -172,12 +175,10 @@ export const getUsers = async (query: GetUserQuery, actor: ActorContext) => {
         ids.length > 0
             ? await profileRepo.find({
                   where: { user_id: In(ids) },
-                  select: ['user_id', 'driver_code'],
+                  select: ['user_id', 'driver_code', 'license_class', 'license_expires_at'],
               })
             : [];
-    const profileByUser = new Map(
-        profiles.map((p) => [p.user_id, p.driver_code] as const),
-    );
+    const profileByUser = new Map(profiles.map((p) => [p.user_id, p] as const));
 
     const data = users.map((u) => ({
         id: u.id,
@@ -188,8 +189,11 @@ export const getUsers = async (query: GetUserQuery, actor: ActorContext) => {
         created_at: u.created_at,
         last_login_at: u.last_login_at,
         agency_id: u.agency_id,
+        agency: u.agency ? { id: u.agency.id, name: u.agency.name } : null,
         role: u.role,
-        driver_code: profileByUser.get(u.id) ?? null,
+        driver_code: profileByUser.get(u.id)?.driver_code ?? null,
+        license_class: profileByUser.get(u.id)?.license_class ?? null,
+        license_expires_at: profileByUser.get(u.id)?.license_expires_at ?? null,
         has_driver_profile: profileByUser.has(u.id),
     }));
 
@@ -262,20 +266,14 @@ export const createUser = async (input: CreateUserInput, actor: ActorContext) =>
 
     await userRepository.save(newUser);
 
-    try {
-        await sendNewAccountCredentialsEmail(
-            newUser.email,
-            newUser.full_name,
-            temporaryPassword,
-            newUser.phone,
-        );
-    } catch (error) {
-        await userRepository.delete({ id: newUser.id });
-        throw new AppError(
-            'Tao tai khoan that bai do khong gui duoc email thong tin dang nhap.',
-            500,
-        );
-    }
+    void sendNewAccountCredentialsEmail(
+        newUser.email,
+        newUser.full_name,
+        temporaryPassword,
+        newUser.phone,
+    ).catch((error) => {
+        console.error('[createUser] Failed to send credentials email:', error);
+    });
 
     return {
         id: newUser.id,

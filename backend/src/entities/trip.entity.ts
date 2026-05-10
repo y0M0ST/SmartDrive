@@ -5,6 +5,7 @@ import { Route } from './route.entity';
 import { Vehicle } from './vehicle.entity';
 import { User } from './user.entity';
 import { AiViolation } from './ai-violation.entity';
+import { GpsLog } from './gps-log.entity';
 import { TripStatus } from '../common/constants/enums';
 
 @Entity('trips')
@@ -64,4 +65,7 @@ export class Trip extends BaseEntity {
 
     @OneToMany(() => AiViolation, (violation) => violation.trip)
     ai_violations: AiViolation[];
+
+    @OneToMany(() => GpsLog, (log) => log.trip)
+    gps_logs: GpsLog[];
 }

@@ -98,7 +98,7 @@ python -m venv venv
 
 # 2. Activate môi trường ảo
 # Trên Mac / Linux:
-source venv/bin/activate
+source venv/bin/activate 
 # Trên Windows:
 .\venv\Scripts\activate
 

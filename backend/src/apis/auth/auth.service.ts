@@ -11,6 +11,10 @@ import { ProfileContactChangeOtp } from '../../entities/profile-contact-change-o
 
 import { UserStatus } from '../../common/constants/enums';
 import { AppError } from '../../common/errors/app-error';
+
+const LOGIN_FAILED_MSG = 'Tên đăng nhập hoặc mật khẩu không chính xác';
+const ACCOUNT_DISABLED_MSG =
+    'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin';
 import { generateTokens } from '../../utils/jwtHelper';
 import { sendResetPasswordEmail, sendProfileContactChangeOtpEmail } from '../../utils/mailer';
 import { assertUniqueEmailPhoneByAgency } from '../users/user.service';
@@ -44,11 +48,11 @@ export const login = async (
     });
 
     if (!user) {
-        throw new Error('Email hoặc mật khẩu không chính xác');
+        throw new AppError(LOGIN_FAILED_MSG, 401);
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-        throw new Error('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin');
+        throw new AppError(ACCOUNT_DISABLED_MSG, 403);
     }
 
     const isPasswordMatch = await bcrypt.compare(
@@ -57,7 +61,7 @@ export const login = async (
     );
 
     if (!isPasswordMatch) {
-        throw new Error('Email hoặc mật khẩu không chính xác');
+        throw new AppError(LOGIN_FAILED_MSG, 401);
     }
 
     const expiresAt = new Date();
@@ -149,7 +153,7 @@ export const changePassword = async (
     const sessionRepository = AppDataSource.getRepository(UserSession);
 
     const user = await userRepository.findOneBy({ id: userId });
-    if (!user) throw new Error('Không tìm thấy người dùng');
+    if (!user) throw new AppError('Không tìm thấy người dùng.', 404);
 
     const isMatch = await bcrypt.compare(
         input.oldPassword,
@@ -157,7 +161,7 @@ export const changePassword = async (
     );
 
     if (!isMatch) {
-        throw new Error('Mật khẩu hiện tại không chính xác');
+        throw new AppError('Mật khẩu hiện tại không chính xác', 400);
     }
 
     user.password_hash = await bcrypt.hash(input.newPassword, 10);
@@ -235,8 +239,9 @@ export const resetPassword = async (input: ResetPasswordInput) => {
     });
 
     if (!resetRecord) {
-        throw new Error(
-            'Đường dẫn đã hết hạn (quá 15 phút) hoặc không hợp lệ, vui lòng yêu cầu gửi lại'
+        throw new AppError(
+            'Đường dẫn đã hết hạn (quá 15 phút), vui lòng yêu cầu gửi lại',
+            400,
         );
     }
 

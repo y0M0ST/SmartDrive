@@ -25,6 +25,12 @@ const swaggerOptions: swaggerJSDoc.Options = {
                     scheme: 'bearer',
                     bearerFormat: 'JWT',
                 },
+                /** Header `x-device-api-key` — trùng `MASTER_DEVICE_API_KEY` (ingest thiết bị). */
+                deviceApiKey: {
+                    type: 'apiKey',
+                    in: 'header',
+                    name: 'x-device-api-key',
+                },
             },
         },
     },

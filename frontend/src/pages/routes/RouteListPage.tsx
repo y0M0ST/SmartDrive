@@ -11,7 +11,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { routeApi } from "@/services/routeApi";
@@ -56,6 +63,88 @@ function getApiMessage(error: unknown): string {
   return typeof m === "string" && m.trim() ? m : "Đã có lỗi xảy ra.";
 }
 
+/** Chọn tỉnh/thành có lọc theo chữ (autocomplete thủ công, không cần cmdk). */
+function ProvinceSearchPicker({
+  value,
+  onValueChange,
+  provinces,
+  disabled,
+  placeholder,
+}: {
+  value: string;
+  onValueChange: (code: string) => void;
+  provinces: VietnamProvinceDto[];
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = useMemo(() => provinces.find((p) => p.code === value), [provinces, value]);
+  const filtered = useMemo(() => {
+    const t = query.trim().toLowerCase();
+    if (!t) return provinces;
+    return provinces.filter(
+      (p) =>
+        p.name.toLowerCase().includes(t) ||
+        p.code.toLowerCase().includes(t) ||
+        p.code.replace(/_/g, " ").toLowerCase().includes(t),
+    );
+  }, [provinces, query]);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setQuery("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className="h-11 w-full justify-between border-2 border-border bg-background font-medium"
+        >
+          <span className="truncate text-left">{selected?.name ?? placeholder}</span>
+          <span className="ml-2 shrink-0 text-muted-foreground">▾</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(100vw-2rem,22rem)] max-w-md p-0" align="start">
+        <Input
+          autoFocus
+          className="rounded-b-none border-x-0 border-t-0 focus-visible:ring-0"
+          placeholder="Gõ để lọc tỉnh/thành…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <div className="max-h-60 overflow-y-auto border-t border-border p-1">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-muted-foreground">Không khớp tỉnh/thành nào.</p>
+          ) : (
+            filtered.map((p) => (
+              <button
+                key={p.code}
+                type="button"
+                className="flex w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted"
+                onClick={() => {
+                  onValueChange(p.code);
+                  setOpen(false);
+                  setQuery("");
+                }}
+              >
+                {p.name}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function RouteListPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRoute, setEditingRoute] = useState<RouteRow | null>(null);
@@ -72,6 +161,7 @@ export default function RouteListPage() {
     distance: "",
     durationText: "",
     estimatedHours: "",
+    status: "ACTIVE" as RouteStatus,
   });
 
   const provinceByCode = useMemo(() => {
@@ -190,6 +280,7 @@ export default function RouteListPage() {
       distance: "",
       durationText: "",
       estimatedHours: "",
+      status: "ACTIVE" as RouteStatus,
     });
     setEditingRoute(null);
     setIsCalculating(false);
@@ -198,6 +289,20 @@ export default function RouteListPage() {
   const openCreate = () => {
     resetForm();
     setIsDialogOpen(true);
+  };
+
+  const onEstimatedHoursInput = (raw: string) => {
+    setFormData((prev) => {
+      const n = Number(raw.replace(",", "."));
+      if (!Number.isFinite(n) || n <= 0) {
+        return { ...prev, estimatedHours: raw };
+      }
+      return {
+        ...prev,
+        estimatedHours: raw.replace(",", "."),
+        durationText: formatDurationVi(Math.round(n * 3600)),
+      };
+    });
   };
 
   const toggleStatus = async (route: RouteRow) => {
@@ -221,7 +326,7 @@ export default function RouteListPage() {
       return;
     }
     const distanceKm = Number(formData.distance);
-    const estHours = Number(formData.estimatedHours);
+    const estHours = Number(String(formData.estimatedHours).replace(",", "."));
     if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
       toast.error("Cự ly (km) phải là số dương — chọn hai tỉnh để hệ thống tính hoặc nhập tay.");
       return;
@@ -241,7 +346,10 @@ export default function RouteListPage() {
 
     try {
       if (editingRoute) {
-        await routeApi.update(editingRoute.id, payload);
+        await routeApi.update(editingRoute.id, {
+          ...payload,
+          status: formData.status,
+        });
         toast.success("Cập nhật tuyến thành công.");
       } else {
         await routeApi.create(payload);
@@ -263,7 +371,7 @@ export default function RouteListPage() {
     if (!confirm(`Xóa tuyến «${route.name}»?`)) return;
     try {
       await routeApi.delete(route.id);
-      toast.success("Đã xóa tuyến đường.");
+      toast.success("Đã ẩn tuyến khỏi danh sách (xóa mềm).");
       void fetchRoutes();
     } catch (error: unknown) {
       toast.error(getApiMessage(error));
@@ -280,6 +388,7 @@ export default function RouteListPage() {
       distance: String(route.distance_km),
       durationText: formatDurationVi(sec),
       estimatedHours: route.estimated_hours.toFixed(2),
+      status: route.status,
     });
     setIsDialogOpen(true);
   };
@@ -305,10 +414,10 @@ export default function RouteListPage() {
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="w-[70px] text-center font-bold">STT</TableHead>
                 <TableHead className="font-bold">Tên tuyến</TableHead>
-                <TableHead className="font-bold">Điểm đi</TableHead>
+                <TableHead className="font-bold">Điểm xuất phát</TableHead>
                 <TableHead className="font-bold">Điểm đến</TableHead>
-                <TableHead className="font-bold">Cự ly</TableHead>
-                <TableHead className="font-bold">Thời gian</TableHead>
+                <TableHead className="font-bold">Cự ly (km)</TableHead>
+                <TableHead className="font-bold">Thời gian dự kiến</TableHead>
                 <TableHead className="font-bold">Trạng thái</TableHead>
                 <TableHead className="text-center font-bold">Hành động</TableHead>
               </TableRow>
@@ -329,7 +438,10 @@ export default function RouteListPage() {
                     <TableCell className="text-foreground">{resolveName(route.end_point)}</TableCell>
                     <TableCell className="text-muted-foreground">{route.distance_km} km</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDurationVi(Math.round(route.estimated_hours * 3600))}
+                      <span className="font-medium text-foreground">
+                        {formatDurationVi(Math.round(route.estimated_hours * 3600))}
+                      </span>
+                      <span className="ml-1 text-xs">({route.estimated_hours} giờ)</span>
                     </TableCell>
                     <TableCell>
                       <Button
@@ -395,54 +507,28 @@ export default function RouteListPage() {
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right font-bold text-foreground">Điểm đi</Label>
+              <Label className="text-right font-bold text-foreground">Điểm xuất phát</Label>
               <div className="col-span-3">
-                <Select
-                  value={formData.startPoint || undefined}
-                  onValueChange={(v) => setFormData((prev) => ({ ...prev, startPoint: v }))}
+                <ProvinceSearchPicker
+                  value={formData.startPoint}
+                  onValueChange={(code) => setFormData((prev) => ({ ...prev, startPoint: code }))}
+                  provinces={provinces}
                   disabled={provincesLoading}
-                >
-                  <SelectTrigger className="h-11 border-2 border-border bg-background font-medium">
-                    <SelectValue placeholder={provincesLoading ? "Đang tải…" : "Chọn điểm đi"} />
-                  </SelectTrigger>
-                  <SelectContent className="z-[9999] max-h-72 border-2 border-border bg-popover text-popover-foreground">
-                    {provinces.map((p) => (
-                      <SelectItem
-                        key={p.code}
-                        value={p.code}
-                        className="cursor-pointer rounded-lg py-3 font-medium focus:bg-blue-50 focus:text-blue-700 hover:bg-blue-50 hover:text-blue-700"
-                      >
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder={provincesLoading ? "Đang tải…" : "Chọn hoặc tìm tỉnh/thành"}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right font-bold text-foreground">Điểm đến</Label>
               <div className="col-span-3">
-                <Select
-                  value={formData.endPoint || undefined}
-                  onValueChange={(v) => setFormData((prev) => ({ ...prev, endPoint: v }))}
+                <ProvinceSearchPicker
+                  value={formData.endPoint}
+                  onValueChange={(code) => setFormData((prev) => ({ ...prev, endPoint: code }))}
+                  provinces={provinces}
                   disabled={provincesLoading}
-                >
-                  <SelectTrigger className="h-11 border-2 border-border bg-background font-medium">
-                    <SelectValue placeholder={provincesLoading ? "Đang tải…" : "Chọn điểm đến"} />
-                  </SelectTrigger>
-                  <SelectContent className="z-[9999] max-h-72 border-2 border-border bg-popover text-popover-foreground">
-                    {provinces.map((p) => (
-                      <SelectItem
-                        key={p.code}
-                        value={p.code}
-                        className="cursor-pointer rounded-lg py-3 font-medium focus:bg-blue-50 focus:text-blue-700 hover:bg-blue-50 hover:text-blue-700"
-                      >
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder={provincesLoading ? "Đang tải…" : "Chọn hoặc tìm tỉnh/thành"}
+                />
               </div>
             </div>
 
@@ -465,15 +551,56 @@ export default function RouteListPage() {
               </div>
 
               <div className="space-y-2 px-1 text-left">
-                <Label className="ml-1 font-semibold text-muted-foreground">Thời gian dự kiến</Label>
+                <Label className="ml-1 font-semibold text-muted-foreground">Thời gian (tóm tắt)</Label>
                 <Input
                   readOnly
                   className="h-11 cursor-default border-border bg-muted/50 font-semibold text-foreground"
-                  placeholder="Chọn đủ 2 tỉnh để tự tính"
+                  placeholder="Chọn đủ 2 tỉnh — Mapbox tự tính"
                   value={formData.durationText}
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="pt-2.5 text-right font-bold text-foreground">Giờ dự kiến</Label>
+              <div className="col-span-3 space-y-1">
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min={0.01}
+                  className="h-11 border-border bg-background font-semibold text-foreground"
+                  placeholder="VD: 2.5"
+                  value={formData.estimatedHours}
+                  onChange={(e) => onEstimatedHoursInput(e.target.value)}
+                />
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  Hệ thống tự động tính toán sau khi chọn điểm đi/đến. Bạn có thể điều chỉnh thủ công nếu cần.
+                </p>
+              </div>
+            </div>
+
+            {editingRoute && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right font-bold text-foreground">Trạng thái</Label>
+                <div className="col-span-3">
+                  <Select
+                    value={formData.status}
+                    onValueChange={(v) =>
+                      setFormData((prev) => ({ ...prev, status: v as RouteStatus }))
+                    }
+                  >
+                    <SelectTrigger className="h-11 w-full border-border bg-background">
+                      <SelectValue placeholder="Chọn trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE">Đang khai thác</SelectItem>
+                      <SelectItem value="SUSPENDED">Tạm ngưng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-2 border-t border-border bg-muted/40 p-6">

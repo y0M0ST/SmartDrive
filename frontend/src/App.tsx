@@ -18,12 +18,16 @@ import {
 import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./pages/auth/LoginPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import RouteListPage from "./pages/routes/RouteListPage";
 import AdminProfilePage from "./pages/profiles/AdminProfilePage";
 import DriverManagement from "./pages/DriverManagement";
+import AccountManagementPage from "./pages/accounts/AccountManagementPage";
 import VehicleManagement from "./pages/VehicleManagement";
+import AgencyOperationsDashboardPage from "./pages/agency/AgencyOperationsDashboardPage";
 import AgencyDashboardPage from "./pages/agency/AgencyDashboardPage";
-import AgencyPlaceholderPage from "./pages/agency/AgencyPlaceholderPage";
+import AgencyDriverLeaderboardPage from "./pages/agency/AgencyDriverLeaderboardPage";
+import AgencyFleetTrackingPage from "./pages/agency/AgencyFleetTrackingPage";
 import TripListPage from "./pages/trips/TripListPage";
 import ViolationListPage from "./pages/violations/ViolationListPage";
 import SuperAdminOverviewPage from "./pages/super-admin/SuperAdminOverviewPage";
@@ -34,6 +38,9 @@ import DriverLayout from "./layouts/DriverLayout";
 import DriverSchedulePage from "./pages/portal/driver/DriverSchedulePage";
 import DriverNotificationsPage from "./pages/portal/driver/DriverNotificationsPage";
 import DriverMePage from "./pages/portal/driver/DriverMePage";
+import DriverViolationsPage from "./pages/portal/driver/DriverViolationsPage";
+import DriverStatisticsPage from "./pages/portal/driver/DriverStatisticsPage";
+import { SessionIdleWatcher } from "./components/auth/SessionIdleWatcher";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem("access_token");
@@ -153,14 +160,16 @@ function App() {
       disableTransitionOnChange
       storageKey="smartdrive-theme"
     >
-      <Toaster position="top-right" richColors duration={10000} closeButton />
+      <Toaster position="top-right" richColors duration={3000} closeButton />
       <BrowserRouter>
         <AuthSynchronizer>
+          <SessionIdleWatcher />
           <Routes>
             <Route path="/" element={<AppRootRedirect />} />
 
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             <Route
               path="/admin"
@@ -174,6 +183,7 @@ function App() {
             >
               <Route index element={<AdminHomeRedirect />} />
               <Route path="profile" element={<AdminProfilePage />} />
+              <Route path="accounts" element={<AccountManagementPage />} />
 
               <Route path="super" element={<SuperAdminShell />}>
                 <Route index element={<Navigate to="overview" replace />} />
@@ -184,21 +194,15 @@ function App() {
               </Route>
 
               <Route element={<AgencyShell />}>
-                <Route path="dashboard" element={<AgencyDashboardPage />} />
+                <Route path="dashboard" element={<AgencyOperationsDashboardPage />} />
                 <Route path="routes" element={<RouteListPage />} />
                 <Route path="drivers" element={<DriverManagement />} />
                 <Route path="vehicles" element={<VehicleManagement />} />
-                <Route path="accounts" element={<Navigate to="/admin/drivers" replace />} />
                 <Route path="trips" element={<TripListPage />} />
+                <Route path="fleet" element={<AgencyFleetTrackingPage />} />
                 <Route path="violations" element={<ViolationListPage />} />
-                <Route
-                  path="ratings"
-                  element={<AgencyPlaceholderPage title="Đánh giá và xếp hạng" />}
-                />
-                <Route
-                  path="finance"
-                  element={<AgencyPlaceholderPage title="Thống kê thu nhập & báo cáo" />}
-                />
+                <Route path="ratings" element={<AgencyDriverLeaderboardPage />} />
+                <Route path="finance" element={<AgencyDashboardPage />} />
               </Route>
             </Route>
 
@@ -214,6 +218,8 @@ function App() {
             >
               <Route index element={<Navigate to="schedule" replace />} />
               <Route path="schedule" element={<DriverSchedulePage />} />
+              <Route path="violations" element={<DriverViolationsPage />} />
+              <Route path="statistics" element={<DriverStatisticsPage />} />
               <Route path="notifications" element={<DriverNotificationsPage />} />
               <Route path="me" element={<DriverMePage />} />
             </Route>
