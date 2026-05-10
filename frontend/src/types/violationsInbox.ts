@@ -7,6 +7,8 @@ export type ViolationUnreadItem = {
   latitude: number | null;
   longitude: number | null;
   trip_code: string | null;
+  driver_name?: string | null;
+  license_plate?: string | null;
 };
 
 export type ViolationsUnreadPayload = {

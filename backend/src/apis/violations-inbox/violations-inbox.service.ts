@@ -12,6 +12,8 @@ export type ViolationUnreadItem = {
     latitude: number | null;
     longitude: number | null;
     trip_code: string | null;
+    driver_name: string | null;
+    license_plate: string | null;
 };
 
 export const getUnreadForAgency = async (
@@ -28,7 +30,7 @@ export const getUnreadForAgency = async (
     const [items, unreadCount] = await Promise.all([
         repo.find({
             where,
-            relations: { trip: true },
+            relations: { trip: true, driver: true, vehicle: true },
             order: { occurred_at: 'DESC' },
             take: query.limit,
         }),
@@ -44,6 +46,8 @@ export const getUnreadForAgency = async (
         latitude: v.latitude ?? null,
         longitude: v.longitude ?? null,
         trip_code: v.trip?.trip_code ?? null,
+        driver_name: v.driver?.full_name ?? null,
+        license_plate: v.vehicle?.license_plate ?? null,
     }));
 
     return { unread_count: unreadCount, items: mapped };

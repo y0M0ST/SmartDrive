@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Loader2 } from "lucide-react";
+import { Bell, ExternalLink, Loader2, X } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,14 @@ import { useAgencySocket } from "@/contexts/AgencySocketContext";
 import { isSuperAdmin, readStoredUserRole } from "@/lib/adminAccess";
 import { VN_IANA } from "@/lib/vnDateRange";
 import { cn } from "@/lib/utils";
+import type { ViolationUnreadItem } from "@/types/violationsInbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function violationTypeVi(t: string): string {
   if (t === "DROWSY") return "Buồn ngủ";
@@ -38,12 +46,16 @@ export function AgencyViolationBell() {
   } = useAgencySocket();
   const [open, setOpen] = useState(false);
   const [ackingId, setAckingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ViolationUnreadItem | null>(null);
 
   if (isSuperAdmin(role) || !agencySocketEnabled) {
     return null;
   }
 
   const badge = unreadCount > 99 ? "99+" : String(unreadCount);
+
+  const mapsHref = (lat: number, lng: number): string =>
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -83,7 +95,7 @@ export function AgencyViolationBell() {
               {unreadItems.map((row) => (
                 <li
                   key={row.id}
-                  className="flex gap-2 rounded-xl border border-border bg-card p-2 text-card-foreground"
+                  className="group flex gap-2 rounded-xl border border-border bg-card p-2 text-card-foreground"
                 >
                   <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                     <img
@@ -99,25 +111,37 @@ export function AgencyViolationBell() {
                       {row.trip_code ?? "—"} · {violationTypeVi(row.type)}
                     </p>
                     <p className="text-[10px] text-muted-foreground">{formatOccurredAt(row.occurred_at)}</p>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className={cn("h-7 w-full text-[11px] font-bold")}
-                      disabled={ackingId === row.id}
-                      onClick={async () => {
-                        setAckingId(row.id);
-                        try {
-                          await acknowledgeViolation(row.id);
-                        } catch {
-                          toast.error("Không đánh dấu được đã xem.");
-                        } finally {
-                          setAckingId(null);
-                        }
-                      }}
-                    >
-                      {ackingId === row.id ? "Đang xử lý…" : "Đã xem"}
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className={cn("h-7 flex-1 text-[11px] font-bold")}
+                        onClick={() => setSelected(row)}
+                      >
+                        Chi tiết
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 opacity-80 transition group-hover:opacity-100"
+                        title="Đã xem và đóng"
+                        disabled={ackingId === row.id}
+                        onClick={async () => {
+                          setAckingId(row.id);
+                          try {
+                            await acknowledgeViolation(row.id);
+                          } catch {
+                            toast.error("Không đánh dấu được đã xem.");
+                          } finally {
+                            setAckingId(null);
+                          }
+                        }}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -125,6 +149,75 @@ export function AgencyViolationBell() {
           )}
         </div>
       </DropdownMenuContent>
+
+      <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Chi tiết vi phạm</DialogTitle>
+            <DialogDescription>
+              {selected ? `${selected.trip_code ?? "—"} · ${violationTypeVi(selected.type)}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selected ? (
+            <div className="space-y-3">
+              <div className="overflow-hidden rounded-xl border border-border">
+                <img
+                  src={selected.image_url}
+                  alt="Ảnh vi phạm"
+                  className="max-h-[260px] w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <div className="space-y-1 text-sm">
+                <p><span className="font-semibold">Loại:</span> {violationTypeVi(selected.type)}</p>
+                <p><span className="font-semibold">Thời điểm:</span> {formatOccurredAt(selected.occurred_at)}</p>
+                <p><span className="font-semibold">Tài xế:</span> {selected.driver_name ?? "—"}</p>
+                <p><span className="font-semibold">Biển số:</span> {selected.license_plate ?? "—"}</p>
+                <p className="text-muted-foreground">
+                  <span className="font-semibold text-foreground">Tọa độ:</span>{" "}
+                  {selected.latitude != null && selected.longitude != null
+                    ? `${selected.latitude.toFixed(5)}, ${selected.longitude.toFixed(5)}`
+                    : "Không có tọa độ"}
+                </p>
+                {selected.latitude != null && selected.longitude != null ? (
+                  <a
+                    href={mapsHref(selected.latitude, selected.longitude)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Mở Google Maps
+                    <ExternalLink className="size-4" />
+                  </a>
+                ) : null}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setSelected(null)}>
+                  Đóng
+                </Button>
+                <Button
+                  disabled={ackingId === selected.id}
+                  onClick={async () => {
+                    setAckingId(selected.id);
+                    try {
+                      await acknowledgeViolation(selected.id);
+                      setSelected(null);
+                    } catch {
+                      toast.error("Không đánh dấu được đã xem.");
+                    } finally {
+                      setAckingId(null);
+                    }
+                  }}
+                >
+                  {ackingId === selected.id ? "Đang xử lý…" : "Đã xem & đóng"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </DropdownMenu>
   );
 }
