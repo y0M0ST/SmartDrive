@@ -20,19 +20,12 @@ import {
 } from "@/components/ui/table";
 import { tripApi } from "@/services/tripApi";
 import type { TripDetail, TripStatusCode } from "@/types/trip";
-import { TRIP_STATUS_LABEL, tripStatusBadgeCn } from "@/lib/tripStatusDisplay";
+import { tripStatusBadgeCn, tripStatusLabel } from "@/lib/tripStatusDisplay";
+import { violationTypeLabel } from "@/lib/violationTypeDisplay";
+import { vehicleTypeLabel } from "@/lib/vehicleDisplay";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 10_000;
-
-const VIOLATION_TYPE_LABEL: Record<string, string> = {
-  DROWSY: "Ngủ gật",
-  DISTRACTED: "Mất tập trung",
-};
-
-function violationTypeLabel(type: string): string {
-  return VIOLATION_TYPE_LABEL[type] ?? type;
-}
 
 function unwrapTripDetail(res: unknown): TripDetail | null {
   const d = (res as { data?: { data?: TripDetail } })?.data?.data;
@@ -184,7 +177,7 @@ export default function TripDetailModal({
                     </div>
                     {status ? (
                       <Badge variant="outline" className={tripStatusBadgeCn(status)}>
-                        {TRIP_STATUS_LABEL[status]}
+                        {tripStatusLabel(status)}
                       </Badge>
                     ) : null}
                   </div>
@@ -251,7 +244,8 @@ export default function TripDetailModal({
                     <div className="mt-2 space-y-1 text-sm text-muted-foreground">
                       {detail.vehicle?.type ? (
                         <p>
-                          Loại: <span className="text-foreground">{detail.vehicle.type}</span>
+                          Loại:{" "}
+                          <span className="text-foreground">{vehicleTypeLabel(detail.vehicle.type)}</span>
                         </p>
                       ) : null}
                       {typeof detail.vehicle?.capacity === "number" ? (

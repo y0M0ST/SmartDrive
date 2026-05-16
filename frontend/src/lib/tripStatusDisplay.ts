@@ -8,6 +8,15 @@ export const TRIP_STATUS_LABEL: Record<TripStatusCode, string> = {
   CANCELLED: "Đã hủy",
 };
 
+const UNKNOWN_TRIP_STATUS_LABEL = "Không xác định";
+
+/** Hiển thị trạng thái chuyến — không bao giờ trả về mã enum thô. */
+export function tripStatusLabel(status: string | null | undefined): string {
+  if (!status?.trim()) return UNKNOWN_TRIP_STATUS_LABEL;
+  const key = status.trim() as TripStatusCode;
+  return TRIP_STATUS_LABEL[key] ?? UNKNOWN_TRIP_STATUS_LABEL;
+}
+
 /** Đồng bộ màu Badge với `TripList`. */
 export function tripStatusBadgeClass(status: TripStatusCode): string {
   switch (status) {

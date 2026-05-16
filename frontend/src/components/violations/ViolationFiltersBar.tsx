@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { VIOLATION_TYPE_LABEL } from "@/lib/violationTypeDisplay";
 import { ViolationDateRangePicker } from "./ViolationDateRangePicker";
 
 const ALL = "__all__";
@@ -120,8 +121,8 @@ export function ViolationFiltersBar({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Tất cả loại</SelectItem>
-              <SelectItem value="DROWSY">Buồn ngủ (DROWSY)</SelectItem>
-              <SelectItem value="DISTRACTED">Mất tập trung (DISTRACTED)</SelectItem>
+              <SelectItem value="DROWSY">{VIOLATION_TYPE_LABEL.DROWSY}</SelectItem>
+              <SelectItem value="DISTRACTED">{VIOLATION_TYPE_LABEL.DISTRACTED}</SelectItem>
             </SelectContent>
           </Select>
         </div>

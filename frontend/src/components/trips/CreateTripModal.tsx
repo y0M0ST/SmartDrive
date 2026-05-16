@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { routeApi } from "@/services/routeApi";
 import { tripApi } from "@/services/tripApi";
+import { vehicleStatusLabel } from "@/lib/vehicleDisplay";
 
 type VehicleOption = { id: string; license_plate: string; status: string };
 
@@ -333,7 +334,9 @@ export default function CreateTripModal({ open, onOpenChange, onCreated }: Creat
                     {vehicles.map((v) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.license_plate}
-                        {v.status !== "AVAILABLE" ? ` (${v.status})` : ""}
+                        {v.status !== "AVAILABLE"
+                          ? ` (${vehicleStatusLabel(v.status)})`
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

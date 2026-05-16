@@ -23,8 +23,8 @@ export function violationBadgeClass(type: string): string {
 }
 
 export function formatViolationCoordinates(v: DriverViolationListItem): string | null {
-  const lat = v.coordinates.latitude;
-  const lng = v.coordinates.longitude;
+  const lat = v.coordinates?.latitude;
+  const lng = v.coordinates?.longitude;
   if (lat == null || lng == null) return null;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;

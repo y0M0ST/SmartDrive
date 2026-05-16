@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { TripRow } from "@/types/trip";
-import { TRIP_STATUS_LABEL, tripStatusBadgeCn } from "@/lib/tripStatusDisplay";
+import { TRIP_STATUS_LABEL, tripStatusBadgeCn, tripStatusLabel } from "@/lib/tripStatusDisplay";
 
 export type TripStatusFilterValue = "" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 
@@ -140,7 +140,7 @@ export default function TripList({
                     <TableCell className="whitespace-nowrap text-sm">{formatDeparture(t.departure_time)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={tripStatusBadgeCn(t.status)}>
-                        {TRIP_STATUS_LABEL[t.status]}
+                        {tripStatusLabel(t.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>

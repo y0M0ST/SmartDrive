@@ -3,12 +3,14 @@ import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
 import api from "@/services/api";
-import VehicleModal, {
-  type VehicleModalInitial,
+import VehicleModal, { type VehicleModalInitial } from "@/components/VehicleModal";
+import ConfirmModal from "@/components/ConfirmModal";
+import {
+  vehicleStatusLabel,
+  vehicleTypeLabel,
   type VehicleStatusCode,
   type VehicleTypeCode,
-} from "@/components/VehicleModal";
-import ConfirmModal from "@/components/ConfirmModal";
+} from "@/lib/vehicleDisplay";
 
 /** Khớp entity `vehicles` từ BE */
 export interface VehicleRow {
@@ -28,18 +30,6 @@ function unwrapVehicleList(res: { data?: { data?: VehicleRow[] | { data?: Vehicl
   }
   return [];
 }
-
-const TYPE_LABEL: Record<VehicleTypeCode, string> = {
-  SEAT: "Ghế ngồi",
-  SLEEPER: "Giường nằm",
-};
-
-const STATUS_LABEL: Record<VehicleStatusCode, string> = {
-  AVAILABLE: "Sẵn sàng",
-  IN_SERVICE: "Đang chạy",
-  MAINTENANCE: "Bảo dưỡng",
-  INACTIVE: "Không hoạt động",
-};
 
 /** Tách theo theme để tránh `dark:` ghi đè `bg-*` đặc (badge bị nền mờ / chữ mất tương phản). */
 function statusBadgeClass(s: VehicleStatusCode, isDark: boolean): string {
@@ -310,13 +300,13 @@ export default function VehicleManagement() {
                         {(currentPage - 1) * itemsPerPage + index + 1}
                       </td>
                       <td className="cursor-pointer px-6 font-bold uppercase text-primary">{v.license_plate}</td>
-                      <td className="px-6 font-medium">{TYPE_LABEL[v.type] ?? v.type}</td>
+                      <td className="px-6 font-medium">{vehicleTypeLabel(v.type)}</td>
                       <td className="px-6 text-center font-medium">{v.capacity}</td>
                       <td className="px-6 text-center">
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-[12px] font-bold ${statusBadgeClass(v.status, isDark)}`}
                         >
-                          {STATUS_LABEL[v.status] ?? v.status}
+                          {vehicleStatusLabel(v.status)}
                         </span>
                       </td>
                       <td className="px-6 font-medium text-muted-foreground">{v.ai_camera_id || "—"}</td>
