@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
+    "render:build": "npm install --include=dev && npm run build",
     "start": "node dist/server.js",
     "migrate": "ts-node src/scripts/run-migration.ts",
     "seed": "ts-node src/scripts/run-seeder.ts",

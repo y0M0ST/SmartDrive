@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { catchAsync } from '../../utils/catchAsync';
 import { ServiceResponse } from '../../models/serviceResponse';
+import type { MulterFile } from '../../types/multer-file';
 import * as profileService from './driver-profile.service';
 import { AppError } from '../../common/errors/app-error';
 
@@ -14,7 +15,7 @@ const getActor = (req: Request) => {
 };
 
 export const createProfile = catchAsync(async (req: Request, res: Response) => {
-    const files = req.files as Express.Multer.File[];
+    const files = req.files as MulterFile[];
     const bodyUserId = req.body.user_id as string;
 
     if (!bodyUserId) {
@@ -34,7 +35,7 @@ export const createProfile = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateProfile = catchAsync(async (req: Request, res: Response) => {
-    const files = req.files as Express.Multer.File[];
+    const files = req.files as MulterFile[];
     const result = await profileService.updateProfile(
         getActor(req),
         req.params.userId as string,

@@ -48,10 +48,11 @@ function normalizeError(err: unknown): AppError {
     }
 
     if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
+        const uploadErr = err as multer.MulterError;
+        if (uploadErr.code === 'LIMIT_FILE_SIZE') {
             return new AppError('Mỗi ảnh tối đa 5MB (.jpg hoặc .png).', 400);
         }
-        return new AppError(err.message || 'Loi upload file.', 400);
+        return new AppError(uploadErr.message || 'Loi upload file.', 400);
     }
 
     if (err instanceof Error) {
