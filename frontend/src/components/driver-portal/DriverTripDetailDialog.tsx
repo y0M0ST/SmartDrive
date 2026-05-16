@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { DriverPortalTrip } from "@/types/driverPortal";
 import type { TripStatusCode } from "@/types/trip";
-import { TRIP_STATUS_LABEL, tripStatusBadgeCnForDriver } from "@/lib/tripStatusDisplay";
+import { tripStatusBadgeCnForDriver, tripStatusLabel } from "@/lib/tripStatusDisplay";
+import { vehicleStatusLabel, vehicleTypeLabel } from "@/lib/vehicleDisplay";
 
 type DriverTripDetailDialogProps = {
   open: boolean;
@@ -58,19 +59,24 @@ export function DriverTripDetailDialog({
   }
 
   const status = trip.status as TripStatusCode;
-  const routeLine = `${resolveProvinceName(trip.route.start_point)} → ${resolveProvinceName(trip.route.end_point)}`;
-  const callHref = telHref(trip.agency.phone);
+  const startPoint = trip.route?.start_point ?? "";
+  const endPoint = trip.route?.end_point ?? "";
+  const routeLine =
+    startPoint || endPoint
+      ? `${resolveProvinceName(startPoint)} → ${resolveProvinceName(endPoint)}`
+      : "Chưa cập nhật";
+  const callHref = telHref(trip.agency?.phone);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] max-w-[480px] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="pr-8 text-left text-lg leading-snug">{trip.route.name}</DialogTitle>
+          <DialogTitle className="pr-8 text-left text-lg leading-snug">{trip.route?.name || "Chưa cập nhật"}</DialogTitle>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Badge variant="outline" className={tripStatusBadgeCnForDriver(status)}>
-              {TRIP_STATUS_LABEL[status] ?? trip.status}
+              {tripStatusLabel(status)}
             </Badge>
-            <span className="font-mono text-sm text-muted-foreground">{trip.trip_code}</span>
+            <span className="font-mono text-sm text-muted-foreground">{trip.trip_code || "Chưa cập nhật"}</span>
           </div>
         </DialogHeader>
 
@@ -79,28 +85,30 @@ export function DriverTripDetailDialog({
             <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Lộ trình</h4>
             <p className="mt-1 font-medium text-foreground">{routeLine}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {trip.route.distance_km} km · dự kiến ~{trip.route.estimated_hours} giờ
+              {trip.route?.distance_km != null ? `${trip.route.distance_km} km` : "Chưa cập nhật"} · dự kiến ~
+              {trip.route?.estimated_hours != null ? ` ${trip.route.estimated_hours} giờ` : " Chưa cập nhật"}
             </p>
           </section>
 
           <section className="rounded-xl border border-border bg-muted/40 p-3">
             <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Xe</h4>
-            <p className="mt-1 font-semibold text-foreground">{trip.vehicle.license_plate}</p>
+            <p className="mt-1 font-semibold text-foreground">{trip.vehicle?.license_plate || "Chưa cập nhật"}</p>
             <p className="text-xs text-muted-foreground">
-              Loại: {trip.vehicle.type} · Trạng thái: {trip.vehicle.status}
+              Loại: {vehicleTypeLabel(trip.vehicle?.type)} · Trạng thái:{" "}
+              {vehicleStatusLabel(trip.vehicle?.status)}
             </p>
           </section>
 
           <section className="rounded-xl border border-border bg-muted/40 p-3">
             <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Nhà xe / Đại lý</h4>
-            <p className="mt-1 font-semibold text-foreground">{trip.agency.name}</p>
-            {trip.agency.code ? (
+            <p className="mt-1 font-semibold text-foreground">{trip.agency?.name || "Chưa cập nhật"}</p>
+            {trip.agency?.code ? (
               <p className="text-xs text-muted-foreground">Mã: {trip.agency.code}</p>
             ) : null}
-            {trip.agency.address ? (
+            {trip.agency?.address ? (
               <p className="mt-1 text-xs text-muted-foreground">{trip.agency.address}</p>
             ) : null}
-            {trip.agency.phone ? (
+            {trip.agency?.phone ? (
               <p className="mt-1 font-mono text-sm text-foreground">{trip.agency.phone}</p>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">Chưa có số điện thoại liên hệ.</p>

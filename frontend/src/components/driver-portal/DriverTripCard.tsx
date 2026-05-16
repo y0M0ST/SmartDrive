@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { DriverPortalTrip } from "@/types/driverPortal";
 import type { TripStatusCode } from "@/types/trip";
-import { TRIP_STATUS_LABEL, tripStatusBadgeCnForDriver } from "@/lib/tripStatusDisplay";
+import { tripStatusBadgeCnForDriver, tripStatusLabel } from "@/lib/tripStatusDisplay";
 import { cn } from "@/lib/utils";
 
 type DriverTripCardProps = {
@@ -27,11 +27,19 @@ function formatDeparture(iso: string): string {
 
 export function DriverTripCard({ trip, resolveProvinceName, onOpen }: DriverTripCardProps) {
   const status = trip.status as TripStatusCode;
-  const label = TRIP_STATUS_LABEL[status] ?? trip.status;
-  const routeLine = `${resolveProvinceName(trip.route.start_point)} → ${resolveProvinceName(trip.route.end_point)}`;
+  const label = tripStatusLabel(status);
+  const startPoint = trip.route?.start_point ?? "";
+  const endPoint = trip.route?.end_point ?? "";
+  const routeLine =
+    startPoint || endPoint
+      ? `${resolveProvinceName(startPoint)} → ${resolveProvinceName(endPoint)}`
+      : "Chưa cập nhật";
   const useActualDeparture =
     Boolean(trip.actual_start_time) && status !== "SCHEDULED";
-  const primaryDepartureIso = useActualDeparture ? trip.actual_start_time! : trip.departure_time;
+  const primaryDepartureIso =
+    useActualDeparture && trip.actual_start_time
+      ? trip.actual_start_time
+      : trip.departure_time ?? "";
 
   return (
     <button
@@ -50,7 +58,7 @@ export function DriverTripCard({ trip, resolveProvinceName, onOpen }: DriverTrip
         <CardContent className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-base font-bold leading-tight tracking-tight text-slate-800 dark:text-slate-100">
-              {trip.route.name}
+              {trip.route?.name || "Chưa cập nhật"}
             </h3>
             <Badge variant="outline" className={tripStatusBadgeCnForDriver(status)}>
               {label}
@@ -59,17 +67,17 @@ export function DriverTripCard({ trip, resolveProvinceName, onOpen }: DriverTrip
           <p className="text-xs leading-snug text-slate-600 dark:text-slate-300">{routeLine}</p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
             <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">
-              {trip.vehicle.license_plate}
+              {trip.vehicle?.license_plate || "Chưa cập nhật"}
             </span>
-            <span>{formatDeparture(primaryDepartureIso)}</span>
+            <span>{primaryDepartureIso ? formatDeparture(primaryDepartureIso) : "Chưa cập nhật"}</span>
           </div>
-          {useActualDeparture ? (
+          {useActualDeparture && trip.departure_time ? (
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
               Dự kiến xuất bến: {formatDeparture(trip.departure_time)}
             </p>
           ) : null}
           <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
-            Mã chuyến · {trip.trip_code}
+            Mã chuyến · {trip.trip_code || "Chưa cập nhật"}
           </p>
         </CardContent>
       </Card>

@@ -5,6 +5,15 @@ export const VIOLATION_TYPE_LABEL: Record<ViolationTypeCode, string> = {
   DISTRACTED: "Mất tập trung",
 };
 
+const UNKNOWN_VIOLATION_TYPE_LABEL = "Không xác định";
+
+/** Hiển thị loại vi phạm AI — không bao giờ trả về mã enum thô. */
+export function violationTypeLabel(type: string | null | undefined): string {
+  if (!type?.trim()) return UNKNOWN_VIOLATION_TYPE_LABEL;
+  const key = type.trim() as ViolationTypeCode;
+  return VIOLATION_TYPE_LABEL[key] ?? UNKNOWN_VIOLATION_TYPE_LABEL;
+}
+
 export function violationTypeBadgeClass(type: string, isDark: boolean): string {
   const t = type as ViolationTypeCode;
   if (t === "DROWSY") {
