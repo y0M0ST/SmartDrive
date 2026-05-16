@@ -5,6 +5,7 @@ import { CreateProfileInput, UpdateProfileInput } from './driver-profile.dto';
 import { AppError } from '../../common/errors/app-error';
 import { User } from '../../entities/user.entity';
 import { uploadImageBufferToCloudinary } from '../../utils/cloudinary';
+import type { MulterFile } from '../../types/multer-file';
 
 type ActorContext = {
     id: string;
@@ -24,7 +25,7 @@ function ensureProfileManager(actor: ActorContext): void {
     }
 }
 
-function assertImageCount(files: Express.Multer.File[]): void {
+function assertImageCount(files: MulterFile[]): void {
     if (!files) return;
     if (files.length > 3) {
         throw new AppError('Chi duoc upload toi da 3 anh.', 400);
@@ -70,7 +71,7 @@ async function findAndAuthorizeTargetDriver(
 
 async function replaceProfileImages(
     profileId: string,
-    files: Express.Multer.File[],
+    files: MulterFile[],
 ) {
     const imageRepo = AppDataSource.getRepository(DriverImage);
     assertImageCount(files || []);
@@ -109,7 +110,7 @@ export const createProfile = async (
     actor: ActorContext,
     userId: string,
     input: CreateProfileInput,
-    files: Express.Multer.File[],
+    files: MulterFile[],
 ) => {
     ensureProfileManager(actor);
     if (actor.role !== ROLES.SUPER_ADMIN && !actor.agency_id) {
@@ -159,7 +160,7 @@ export const updateProfile = async (
     actor: ActorContext,
     userId: string,
     input: UpdateProfileInput,
-    files: Express.Multer.File[],
+    files: MulterFile[],
 ) => {
     ensureProfileManager(actor);
     if (actor.role !== ROLES.SUPER_ADMIN && !actor.agency_id) {
