@@ -4,13 +4,23 @@ import { Agency } from '../../entities/agency.entity';
 import { Role } from '../../entities/role.entity';
 import { User } from '../../entities/user.entity';
 import { UserStatus } from '../../common/constants/enums';
+import { SEED_AGENCY_COUNT } from './agency.seeder';
 
 const DEFAULT_PASSWORD = process.env.DEFAULT_PASSWORD?.trim() || '@Password123';
 
+/** Số tài xế mỗi nhà xe (15 agency × 15 = 225 driver). */
+export const SEED_DRIVERS_PER_AGENCY = 15;
+
+const ALL_USER_STATUSES: UserStatus[] = [
+    UserStatus.ACTIVE,
+    UserStatus.INACTIVE,
+    UserStatus.BLOCKED,
+];
+
 /**
- * Tao email seed khong gan ten ca nhan trong code.
- * - SEED_USER_EMAIL_DOMAIN: domain (mac dinh example.com — RFC reserved, khong can hop le voi inbox that)
- * - SEED_USER_EMAIL_LOCAL_PREFIX: neu dat (vd catch-all), local = prefix+localKey@domain; bo trong thi localKey@domain
+ * Tạo email seed không gắn tên cá nhân trong code.
+ * - SEED_USER_EMAIL_DOMAIN: domain (mặc định example.com)
+ * - SEED_USER_EMAIL_LOCAL_PREFIX: nếu đặt (vd catch-all), local = prefix+localKey@domain
  */
 function buildSeedEmail(localKey: string): string {
     const domain = (process.env.SEED_USER_EMAIL_DOMAIN || 'example.com').trim() || 'example.com';
@@ -26,97 +36,84 @@ type UserSeedInput = {
     phone: string;
     roleName: string;
     agencyCode?: string;
-    status?: UserStatus;
+    status: UserStatus;
 };
 
 function buildUsersSeed(): UserSeedInput[] {
-    const users: UserSeedInput[] = [
-        // SUPER_ADMIN + ACTIVE
-        {
-            username: 'superadmin',
-            full_name: 'Super Admin',
-            email: buildSeedEmail('admin.superadmin'),
-            phone: '0988000001',
-            roleName: 'SUPER_ADMIN',
-            status: UserStatus.ACTIVE,
-        },
-        // SUPER_ADMIN + INACTIVE
-        {
-            username: 'superadmin_inactive',
-            full_name: 'Super Admin Inactive',
-            email: buildSeedEmail('admin.superadmin.inactive'),
-            phone: '0988000002',
-            roleName: 'SUPER_ADMIN',
-            status: UserStatus.INACTIVE,
-        },
-        // SUPER_ADMIN + BLOCKED
-        {
-            username: 'superadmin_blocked',
-            full_name: 'Super Admin Blocked',
-            email: buildSeedEmail('admin.superadmin.blocked'),
-            phone: '0988000003',
-            roleName: 'SUPER_ADMIN',
-            status: UserStatus.BLOCKED,
-        },
-    ];
+    const users: UserSeedInput[] = [];
 
-    for (let i = 1; i <= 10; i += 1) {
-        const suffix = String(i).padStart(2, '0');
+    // —— 1 Super Admin (đăng nhập chính) ——
+    users.push({
+        username: 'superadmin',
+        full_name: 'Super Admin',
+        email: buildSeedEmail('admin.superadmin'),
+        phone: '0988000001',
+        roleName: 'SUPER_ADMIN',
+        status: UserStatus.ACTIVE,
+    });
+
+    // —— 15 Agency Admin (mỗi nhà xe 1 admin) ——
+    // AGENCY_02 / AGENCY_03: INACTIVE & BLOCKED để phủ đủ status user (cùng với driver bên dưới).
+    for (let agencyNo = 1; agencyNo <= SEED_AGENCY_COUNT; agencyNo += 1) {
+        const suffix = String(agencyNo).padStart(2, '0');
+        const agencyCode = `AGENCY_${suffix}`;
+
+        let status = UserStatus.ACTIVE;
+        if (agencyNo === 2) status = UserStatus.INACTIVE;
+        if (agencyNo === 3) status = UserStatus.BLOCKED;
+
         users.push({
-            username: `agencyadmin${suffix}`,
-            full_name: `Agency Admin ${suffix}`,
-            email: buildSeedEmail(`agency.admin${suffix}`),
-            phone: `09881${String(i).padStart(5, '0')}`,
+            username: `agencyadmin_${suffix}`,
+            full_name: `Quản lý nhà xe ${suffix}`,
+            email: buildSeedEmail(`agency.admin.${suffix}`),
+            phone: `09881${String(agencyNo).padStart(5, '0')}`,
             roleName: 'AGENCY_ADMIN',
-            agencyCode: `AGENCY_${suffix}`,
-            status: UserStatus.ACTIVE,
+            agencyCode,
+            status,
         });
     }
-    // AGENCY_ADMIN + INACTIVE
-    users.push({
-        username: 'agencyadmin_inactive',
-        full_name: 'Agency Admin Inactive',
-        email: buildSeedEmail('agency.admin.inactive'),
-        phone: '0988199998',
-        roleName: 'AGENCY_ADMIN',
-        agencyCode: 'AGENCY_01',
-        status: UserStatus.INACTIVE,
-    });
-    // AGENCY_ADMIN + BLOCKED
-    users.push({
-        username: 'agencyadmin_blocked',
-        full_name: 'Agency Admin Blocked',
-        email: buildSeedEmail('agency.admin.blocked'),
-        phone: '0988199999',
-        roleName: 'AGENCY_ADMIN',
-        agencyCode: 'AGENCY_02',
-        status: UserStatus.BLOCKED,
-    });
 
-    for (let i = 1; i <= 20; i += 1) {
-        const suffix = String(i).padStart(2, '0');
-        users.push({
-            username: `driver${suffix}`,
-            full_name: `Driver ${suffix}`,
-            email: buildSeedEmail(`driver${suffix}`),
-            phone: `09883${String(i).padStart(5, '0')}`,
-            roleName: 'DRIVER',
-            agencyCode: `AGENCY_${String(((i - 1) % 10) + 1).padStart(2, '0')}`,
-            status: i <= 2 ? UserStatus.INACTIVE : UserStatus.ACTIVE,
-        });
+    // —— 15 × 15 Driver ——
+    for (let agencyNo = 1; agencyNo <= SEED_AGENCY_COUNT; agencyNo += 1) {
+        const agencySuffix = String(agencyNo).padStart(2, '0');
+        const agencyCode = `AGENCY_${agencySuffix}`;
+
+        for (let driverNo = 1; driverNo <= SEED_DRIVERS_PER_AGENCY; driverNo += 1) {
+            const driverSuffix = String(driverNo).padStart(2, '0');
+            const username = `driver_${agencySuffix}_${driverSuffix}`;
+
+            let status = UserStatus.ACTIVE;
+            // Nhà xe 01: 2 tài xế cuối = INACTIVE + BLOCKED (phủ status còn lại cho role DRIVER).
+            if (agencyNo === 1 && driverNo === SEED_DRIVERS_PER_AGENCY - 1) {
+                status = UserStatus.INACTIVE;
+            }
+            if (agencyNo === 1 && driverNo === SEED_DRIVERS_PER_AGENCY) {
+                status = UserStatus.BLOCKED;
+            }
+
+            users.push({
+                username,
+                full_name: `Tài xế ${agencySuffix}-${driverSuffix}`,
+                email: buildSeedEmail(`driver.${agencySuffix}.${driverSuffix}`),
+                phone: `09${String(agencyNo).padStart(2, '0')}${String(driverNo).padStart(3, '0')}`.slice(0, 11),
+                roleName: 'DRIVER',
+                agencyCode,
+                status,
+            });
+        }
     }
-    // DRIVER + BLOCKED
-    users.push({
-        username: 'driver_blocked',
-        full_name: 'Driver Blocked',
-        email: buildSeedEmail('driver.blocked'),
-        phone: '0988399999',
-        roleName: 'DRIVER',
-        agencyCode: 'AGENCY_03',
-        status: UserStatus.BLOCKED,
-    });
 
     return users;
+}
+
+/** Kiểm tra seed có ít nhất một user cho mỗi UserStatus (ACTIVE / INACTIVE / BLOCKED). */
+function assertUserStatusCoverage(seeds: UserSeedInput[]): void {
+    const covered = new Set(seeds.map((s) => s.status));
+    for (const st of ALL_USER_STATUSES) {
+        if (!covered.has(st)) {
+            throw new Error(`User seeder thiếu tài khoản trạng thái ${st}`);
+        }
+    }
 }
 
 export async function seedUsers(): Promise<void> {
@@ -128,8 +125,10 @@ export async function seedUsers(): Promise<void> {
     const roleMap = new Map(roles.map((role) => [role.name, role]));
     const agencyMap = new Map(agencies.map((agency) => [agency.code, agency]));
 
-    const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
     const userSeeds = buildUsersSeed();
+    assertUserStatusCoverage(userSeeds);
+
+    const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
     for (const seed of userSeeds) {
         const role = roleMap.get(seed.roleName);
@@ -142,9 +141,6 @@ export async function seedUsers(): Promise<void> {
             throw new Error(`Missing agency for user seeder: ${seed.agencyCode}`);
         }
 
-        // IMPORTANT:
-        // users uses soft-delete (deleted_at). If a username exists in soft-deleted state,
-        // normal findOne() will not return it, then insert will fail on unique(username).
         const existing = await userRepo.findOne({
             where: { username: seed.username },
             withDeleted: true,
@@ -156,9 +152,8 @@ export async function seedUsers(): Promise<void> {
             existing.phone = seed.phone;
             existing.role_id = role.id;
             existing.agency_id = agency?.id ?? null;
-            existing.status = seed.status ?? UserStatus.ACTIVE;
+            existing.status = seed.status;
             existing.password_hash = hashedPassword;
-            // revive soft-deleted user for deterministic/idempotent seeding
             if (existing.deleted_at) {
                 existing.deleted_at = null;
             }
@@ -174,8 +169,21 @@ export async function seedUsers(): Promise<void> {
             role_id: role.id,
             agency_id: agency?.id ?? null,
             password_hash: hashedPassword,
-            status: seed.status ?? UserStatus.ACTIVE,
+            status: seed.status,
         });
         await userRepo.save(user);
     }
+
+    const superAdminCount = userSeeds.filter((u) => u.roleName === 'SUPER_ADMIN').length;
+    const agencyAdminCount = userSeeds.filter((u) => u.roleName === 'AGENCY_ADMIN').length;
+    const driverCount = userSeeds.filter((u) => u.roleName === 'DRIVER').length;
+
+    console.log(
+        `[seed:users] SUPER_ADMIN=${superAdminCount}, AGENCY_ADMIN=${agencyAdminCount}, DRIVER=${driverCount} (tổng ${userSeeds.length})`,
+    );
+    console.log(
+        `[seed:users] UserStatus: ACTIVE=${userSeeds.filter((u) => u.status === UserStatus.ACTIVE).length}, ` +
+            `INACTIVE=${userSeeds.filter((u) => u.status === UserStatus.INACTIVE).length}, ` +
+            `BLOCKED=${userSeeds.filter((u) => u.status === UserStatus.BLOCKED).length}`,
+    );
 }

@@ -17,7 +17,15 @@ import { registerAgencySocketIo } from './socket/agency-socket';
 const port = process.env.PORT || 3000;
 const app = express();
 
-app.use(cors());
+/** Đồng bộ với Socket.io — danh sách origin từ `FRONTEND_URL` (phân tách bằng dấu phẩy). */
+const corsOrigins = process.env.FRONTEND_URL?.split(',').map((s) => s.trim()).filter(Boolean);
+
+app.use(
+    cors({
+        origin: corsOrigins?.length ? corsOrigins : true,
+        credentials: true,
+    }),
+);
 app.use(express.json());
 app.use(morgan('dev'));
 app.use('/api', apiRoutes);
@@ -27,7 +35,6 @@ app.use(globalErrorHandler);
 
 const httpServer = http.createServer(app);
 
-const corsOrigins = process.env.FRONTEND_URL?.split(',').map((s) => s.trim()).filter(Boolean);
 const io = new Server(httpServer, {
     cors: {
         origin: corsOrigins?.length ? corsOrigins : true,
