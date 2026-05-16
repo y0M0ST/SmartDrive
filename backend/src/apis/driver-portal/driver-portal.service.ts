@@ -77,39 +77,87 @@ export type DriverPortalTripListItem = {
     agency: DriverPortalAgencyDto;
 };
 
+const FALLBACK_ROUTE: DriverPortalRouteDto = {
+    id: '',
+    code: '',
+    name: 'Chưa cập nhật',
+    start_point: '',
+    end_point: '',
+    distance_km: 0,
+    estimated_hours: 0,
+    status: '',
+};
+
+const FALLBACK_VEHICLE: DriverPortalVehicleDto = {
+    id: '',
+    license_plate: 'Chưa cập nhật',
+    type: 'Chưa cập nhật',
+    status: '',
+};
+
+const FALLBACK_AGENCY: DriverPortalAgencyDto = {
+    id: '',
+    code: '',
+    name: 'Chưa cập nhật',
+    phone: null,
+    address: null,
+    status: '',
+};
+
+const mapRouteDto = (route: Trip['route'] | null | undefined): DriverPortalRouteDto => {
+    if (!route) {
+        return { ...FALLBACK_ROUTE };
+    }
+    return {
+        id: route.id,
+        code: route.code ?? '',
+        name: route.name ?? 'Chưa cập nhật',
+        start_point: route.start_point ?? '',
+        end_point: route.end_point ?? '',
+        distance_km: route.distance_km ?? 0,
+        estimated_hours: route.estimated_hours ?? 0,
+        status: route.status ?? '',
+    };
+};
+
+const mapVehicleDto = (vehicle: Trip['vehicle'] | null | undefined): DriverPortalVehicleDto => {
+    if (!vehicle) {
+        return { ...FALLBACK_VEHICLE };
+    }
+    return {
+        id: vehicle.id,
+        license_plate: vehicle.license_plate ?? 'Chưa cập nhật',
+        type: vehicle.type ?? 'Chưa cập nhật',
+        status: vehicle.status ?? '',
+    };
+};
+
+const mapAgencyDto = (agency: Trip['agency'] | null | undefined): DriverPortalAgencyDto => {
+    if (!agency) {
+        return { ...FALLBACK_AGENCY };
+    }
+    return {
+        id: agency.id,
+        code: agency.code ?? '',
+        name: agency.name ?? 'Chưa cập nhật',
+        phone: agency.phone ?? null,
+        address: agency.address ?? null,
+        status: agency.status ?? '',
+    };
+};
+
 const mapTrip = (t: Trip): DriverPortalTripListItem => ({
     id: t.id,
-    trip_code: t.trip_code,
+    trip_code: t.trip_code ?? '',
     status: t.status,
     departure_time: t.departure_time,
     planned_end_time: t.planned_end_time,
     actual_start_time: t.actual_start_time ?? null,
     actual_end_time: t.actual_end_time ?? null,
     cancel_reason: t.cancel_reason ?? null,
-    route: {
-        id: t.route.id,
-        code: t.route.code,
-        name: t.route.name,
-        start_point: t.route.start_point,
-        end_point: t.route.end_point,
-        distance_km: t.route.distance_km,
-        estimated_hours: t.route.estimated_hours,
-        status: t.route.status,
-    },
-    vehicle: {
-        id: t.vehicle.id,
-        license_plate: t.vehicle.license_plate,
-        type: t.vehicle.type,
-        status: t.vehicle.status,
-    },
-    agency: {
-        id: t.agency.id,
-        code: t.agency.code,
-        name: t.agency.name,
-        phone: t.agency.phone ?? null,
-        address: t.agency.address ?? null,
-        status: t.agency.status,
-    },
+    route: mapRouteDto(t.route),
+    vehicle: mapVehicleDto(t.vehicle),
+    agency: mapAgencyDto(t.agency),
 });
 
 /**

@@ -1,6 +1,9 @@
 import { AppDataSource } from '../../config/data-source';
 import { Agency } from '../../entities/agency.entity';
 
+/** Số nhà xe seed (đồng bộ với `user.seeder.ts`). */
+export const SEED_AGENCY_COUNT = 15;
+
 type AgencySeed = {
     code: string;
     name: string;
@@ -9,16 +12,18 @@ type AgencySeed = {
     status: string;
 };
 
-const AGENCY_DEFINITIONS: AgencySeed[] = Array.from({ length: 10 }, (_, idx) => {
+const AGENCY_DEFINITIONS: AgencySeed[] = Array.from({ length: SEED_AGENCY_COUNT }, (_, idx) => {
     const no = idx + 1;
-    const code = `AGENCY_${String(no).padStart(2, '0')}`;
+    const suffix = String(no).padStart(2, '0');
+    const code = `AGENCY_${suffix}`;
 
     return {
         code,
-        name: `Agency ${String(no).padStart(2, '0')}`,
-        address: `So ${no} Duong Mau, Thanh pho Ho Chi Minh`,
-        phone: `0900000${String(no).padStart(3, '0')}`,
-        status: no === 9 ? 'INACTIVE' : 'ACTIVE',
+        name: `Nhà xe ${suffix}`,
+        address: `Số ${no} Đường Trần Hưng Đạo, TP.HCM`,
+        phone: `02838${String(no).padStart(6, '0')}`.slice(0, 11),
+        /** Một nhà xe INACTIVE để test lọc / trạng thái đại lý. */
+        status: no === SEED_AGENCY_COUNT ? 'INACTIVE' : 'ACTIVE',
     };
 });
 
