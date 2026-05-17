@@ -95,3 +95,10 @@ export const checkinTrip = catchAsync(async (req: Request, res: Response) => {
         ),
     );
 });
+
+export const completeTrip = catchAsync(async (req: Request, res: Response) => {
+    const driverUserId = getDriverUserIdFromJwt(req);
+    const tripId = req.params.tripId as string;
+    const trip = await driverPortalService.completeTrip(driverUserId, tripId);
+    res.status(200).json(ServiceResponse.success('Đã kết thúc chuyến đi thành công.', trip));
+});

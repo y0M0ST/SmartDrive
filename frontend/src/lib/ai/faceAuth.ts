@@ -93,7 +93,7 @@ export async function getFaceDescriptor(
  * Ngưỡng Euclidean descriptor (face-api): càng **nhỏ** càng khắt — giảm FAR (nhận nhầm người giống nhau).
  * Khớp khi `distance < FACE_MATCH_THRESHOLD`. Đồng bộ với backend `FACE_MATCH_DISTANCE_THRESHOLD`.
  */
-export const FACE_MATCH_THRESHOLD = 0.5;
+export const FACE_MATCH_THRESHOLD = 0.45;
 
 export function faceDistanceToMatchScore(distance: number): number {
   const d = Math.min(Math.max(distance, 0), 1);

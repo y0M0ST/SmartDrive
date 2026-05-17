@@ -62,10 +62,13 @@ export const saveFaceTemplateBodySchema = z.object({
     }),
 });
 
-export const tripCheckinSchema = z.object({
+export const tripIdParamSchema = z.object({
     params: z.object({
-        tripId: z.string().uuid(),
+        tripId: z.string().uuid('ID chuyến đi không hợp lệ'),
     }),
+});
+
+export const tripCheckinSchema = tripIdParamSchema.extend({
     /** SUCCESS bắt buộc kèm `faceEncoding` để server tự tính Euclidean — không tin matchScore từ client. */
     body: z.discriminatedUnion('result', [
         z.object({
@@ -83,6 +86,8 @@ export const tripCheckinSchema = z.object({
         }),
     ]),
 });
+
+export const completeTripSchema = tripIdParamSchema;
 
 export type SaveFaceTemplateBody = z.infer<typeof saveFaceTemplateBodySchema>['body'];
 export type TripCheckinBody = z.infer<typeof tripCheckinSchema>['body'];

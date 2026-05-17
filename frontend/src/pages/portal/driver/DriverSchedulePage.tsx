@@ -9,7 +9,14 @@ import type { DriverPortalTrip } from "@/types/driverPortal";
 import { DriverTripCard } from "@/components/driver-portal/DriverTripCard";
 import { DriverTripDetailDialog } from "@/components/driver-portal/DriverTripDetailDialog";
 import { FaceScannerModal, type FaceScannerMode } from "@/components/driver-portal/FaceScannerModal";
+import ConfirmModal from "@/components/ConfirmModal";
 import { cn } from "@/lib/utils";
+
+function getApiMessage(error: unknown): string {
+  const ax = error as { response?: { data?: { message?: string } } };
+  const msg = ax.response?.data?.message;
+  return typeof msg === "string" && msg.trim() !== "" ? msg : "Không thực hiện được. Vui lòng thử lại.";
+}
 
 function unwrapProvinceList(res: { data?: { data?: VietnamProvinceDto[] } }): VietnamProvinceDto[] {
   const d = res.data?.data;
@@ -60,6 +67,9 @@ export default function DriverSchedulePage() {
   const [faceScannerOpen, setFaceScannerOpen] = useState(false);
   const [faceScannerMode, setFaceScannerMode] = useState<FaceScannerMode>("register");
   const [faceScannerTripId, setFaceScannerTripId] = useState<string | undefined>(undefined);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
+  const [tripToComplete, setTripToComplete] = useState<DriverPortalTrip | null>(null);
+  const [completingTrip, setCompletingTrip] = useState(false);
 
   const provinceByCode = useMemo(() => {
     const m = new Map<string, VietnamProvinceDto>();
@@ -181,6 +191,29 @@ export default function DriverSchedulePage() {
     [faceCheckinLocked],
   );
 
+  const handleRequestCompleteTrip = useCallback((trip: DriverPortalTrip) => {
+    setTripToComplete(trip);
+    setCompleteConfirmOpen(true);
+  }, []);
+
+  const handleConfirmCompleteTrip = useCallback(async () => {
+    if (!tripToComplete || completingTrip) return;
+    setCompletingTrip(true);
+    try {
+      await driverApi.completeTrip(tripToComplete.id);
+      toast.success("Đã kết thúc chuyến đi. Bạn có thể nhận chuyến mới khi được phân công.");
+      setCompleteConfirmOpen(false);
+      setTripToComplete(null);
+      setDetailOpen(false);
+      setDetailTrip(null);
+      await loadTrips();
+    } catch (error: unknown) {
+      toast.error(getApiMessage(error));
+    } finally {
+      setCompletingTrip(false);
+    }
+  }, [tripToComplete, completingTrip, loadTrips]);
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div>
@@ -291,6 +324,21 @@ export default function DriverSchedulePage() {
         faceCheckinLocked={faceCheckinLocked}
         onRegisterFace={handleRegisterFaceFromDialog}
         onStartTrip={handleStartTripFromDialog}
+        onCompleteTrip={handleRequestCompleteTrip}
+      />
+
+      <ConfirmModal
+        isOpen={completeConfirmOpen}
+        onClose={() => {
+          if (completingTrip) return;
+          setCompleteConfirmOpen(false);
+          setTripToComplete(null);
+        }}
+        onConfirm={() => void handleConfirmCompleteTrip()}
+        title="Kết thúc chuyến đi"
+        message="Bạn có chắc chắn muốn kết thúc hành trình này không"
+        itemName=""
+        suffix="Hành động này không thể hoàn tác."
       />
 
       <FaceScannerModal

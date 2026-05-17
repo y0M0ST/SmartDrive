@@ -1,4 +1,4 @@
-import { Camera, Phone, Play, ShieldAlert } from "lucide-react";
+import { Camera, Phone, Play, ShieldAlert, Square } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ type DriverTripDetailDialogProps = {
   faceCheckinLocked: boolean;
   onRegisterFace: () => void;
   onStartTrip: (trip: DriverPortalTrip) => void;
+  onCompleteTrip: (trip: DriverPortalTrip) => void;
 };
 
 function formatIso(iso: string | null | undefined): string {
@@ -53,6 +54,7 @@ export function DriverTripDetailDialog({
   faceCheckinLocked,
   onRegisterFace,
   onStartTrip,
+  onCompleteTrip,
 }: DriverTripDetailDialogProps) {
   if (!trip) {
     return <Dialog open={false} onOpenChange={onOpenChange} />;
@@ -177,6 +179,17 @@ export function DriverTripDetailDialog({
               >
                 <Play className="size-4" aria-hidden />
                 Bắt đầu chuyến đi
+              </Button>
+            ) : null}
+
+            {trip.status === "IN_PROGRESS" ? (
+              <Button
+                type="button"
+                className="w-full gap-2 bg-orange-600 text-white hover:bg-orange-700 focus-visible:ring-orange-500"
+                onClick={() => onCompleteTrip(trip)}
+              >
+                <Square className="size-4" aria-hidden />
+                Kết thúc chuyến đi
               </Button>
             ) : null}
           </div>

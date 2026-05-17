@@ -17,7 +17,7 @@ import type {
 const FACE_ENCODING_DIM = 128;
 
 /** Đồng bộ `FACE_MATCH_THRESHOLD` (frontend faceAuth) — `distance >=` ngưỡng → FACE_MISMATCH 400. */
-const FACE_MATCH_DISTANCE_THRESHOLD = 0.5;
+const FACE_MATCH_DISTANCE_THRESHOLD = 0.45;
 
 function faceEuclideanDistance(a: number[], b: number[]): number {
     if (a.length !== b.length || a.length !== FACE_ENCODING_DIM) {
@@ -432,12 +432,42 @@ const checkinTripImpl = async (
     throw new BadRequestException(CHECKIN_FAIL_MESSAGE);
 };
 
+const completeTripImpl = async (driverUserId: string, tripId: string): Promise<DriverPortalTripListItem> => {
+    const tripRepo = AppDataSource.getRepository(Trip);
+    const trip = await tripRepo.findOne({ where: { id: tripId } });
+
+    if (!trip || trip.driver_id !== driverUserId) {
+        throw new AppError('Không tìm thấy chuyến đi hoặc chuyến không thuộc về bạn.', 404);
+    }
+    if (trip.status !== TripStatus.IN_PROGRESS) {
+        throw new BadRequestException('Chỉ có thể kết thúc chuyến đang ở trạng thái đang chạy (IN_PROGRESS).');
+    }
+
+    await AppDataSource.transaction(async (manager) => {
+        const tRepo = manager.getRepository(Trip);
+        trip.status = TripStatus.COMPLETED;
+        trip.actual_end_time = new Date();
+        await tRepo.save(trip);
+        await syncVehicleStatusFromActiveTrips(trip.agency_id, trip.vehicle_id, manager);
+    });
+
+    const updated = await tripRepo.findOne({
+        where: { id: tripId },
+        relations: ['route', 'vehicle', 'agency'],
+    });
+    if (!updated) {
+        throw new AppError('Không tìm thấy chuyến đi sau khi cập nhật.', 500);
+    }
+    return mapTrip(updated);
+};
+
 export const DriverPortalService = {
     getMyTrips: getMyTripsImpl,
     getMyViolations: getMyViolationsImpl,
     saveFaceTemplate: saveFaceTemplateImpl,
     getFaceTemplate: getFaceTemplateImpl,
     checkinTrip: checkinTripImpl,
+    completeTrip: completeTripImpl,
 };
 
 export const getMyTrips = DriverPortalService.getMyTrips;
@@ -445,3 +475,4 @@ export const getMyViolations = DriverPortalService.getMyViolations;
 export const saveFaceTemplate = DriverPortalService.saveFaceTemplate;
 export const getFaceTemplate = DriverPortalService.getFaceTemplate;
 export const checkinTrip = DriverPortalService.checkinTrip;
+export const completeTrip = DriverPortalService.completeTrip;
