@@ -8,6 +8,8 @@ interface ConfirmModalProps {
   title?: string;
   message?: string;
   itemName?: string; // Tên của đối tượng đang muốn xóa (VD: "Tài xế Nguyễn Văn A")
+  /** Thay cho câu "Hành động này không thể hoàn tác." (VD: xóa mềm xe) */
+  suffix?: string;
 }
 
 const ConfirmModal = ({ 
@@ -16,7 +18,8 @@ const ConfirmModal = ({
   onConfirm, 
   title = "Xác nhận xóa", 
   message = "Bạn có chắc chắn muốn xóa",
-  itemName = "dữ liệu này"
+  itemName = "dữ liệu này",
+  suffix = "Hành động này không thể hoàn tác.",
 }: ConfirmModalProps): ReactElement | null => {
   if (!isOpen) return null;
 
@@ -34,7 +37,11 @@ const ConfirmModal = ({
           
           <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-2">{title}</h3>
           <p className="text-sm text-gray-500 dark:text-slate-400">
-            {message} <span className="font-semibold text-gray-800 dark:text-slate-200">"{itemName}"</span>? Hành động này không thể hoàn tác.
+            {message}{" "}
+            {itemName ? (
+              <span className="font-semibold text-gray-800 dark:text-slate-200">"{itemName}"</span>
+            ) : null}
+            ? {suffix}
           </p>
         </div>
 

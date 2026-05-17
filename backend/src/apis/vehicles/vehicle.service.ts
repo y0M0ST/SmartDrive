@@ -4,6 +4,10 @@ import { Vehicle } from '../../entities/vehicle.entity';
 import { VehicleStatus } from '../../common/constants/enums';
 import { CreateVehicleInput, UpdateVehicleInput, GetVehicleQuery } from './vehicle.dto';
 import { AppError } from '../../common/errors/app-error';
+import {
+    assertVehicleHasNoActiveTrips,
+    findActiveTripsForVehicle,
+} from './vehicle-trip-sync';
 
 const normalizeLicensePlate = (plate: string) => plate.trim().toUpperCase();
 const normalizeCameraId = (cameraId?: string | null) => {
@@ -87,6 +91,20 @@ export const updateVehicle = async (agencyId: string, vehicleId: string, input: 
     const normalizedLicensePlate = input.license_plate ? normalizeLicensePlate(input.license_plate) : undefined;
     const normalizedCameraId = input.ai_camera_id !== undefined ? normalizeCameraId(input.ai_camera_id) : undefined;
 
+    const activeTrips = await findActiveTripsForVehicle(agencyId, vehicleId);
+    if (activeTrips.length > 0) {
+        const changingPlate =
+            normalizedLicensePlate !== undefined && normalizedLicensePlate !== vehicle.license_plate;
+        const changingCamera =
+            normalizedCameraId !== undefined && normalizedCameraId !== vehicle.ai_camera_id;
+        if (changingPlate || changingCamera) {
+            throw new AppError(
+                `Xe đang được gán cho chuyến ${activeTrips[0].trip_code}. Không được sửa biển số hoặc mã Camera AI.`,
+                400,
+            );
+        }
+    }
+
     // Check trùng biển số
     if (normalizedLicensePlate) {
         const existPlate = await vehicleRepo.findOneBy({ agency_id: agencyId, license_plate: normalizedLicensePlate, id: Not(vehicleId) });
@@ -121,9 +139,21 @@ export const changeVehicleStatus = async (agencyId: string, vehicleId: string, s
     const vehicle = await vehicleRepo.findOneBy({ id: vehicleId, agency_id: agencyId });
     if (!vehicle) throw new AppError('Không tìm thấy phương tiện', 404);
 
-    // Nếu xe đang chạy ngoài đường thì không được cho đi bảo dưỡng ngang xương
-    if (vehicle.status === VehicleStatus.IN_SERVICE && status !== VehicleStatus.IN_SERVICE) {
-        throw new AppError('Xe đang trong chuyến đi, không thể đổi trạng thái ngay lúc này!', 400);
+    if (status === VehicleStatus.IN_SERVICE) {
+        throw new AppError(
+            'Trạng thái "Đang chạy" do hệ thống tự động cập nhật khi có chuyến IN_PROGRESS.',
+            400,
+        );
+    }
+
+    const activeTrips = await findActiveTripsForVehicle(agencyId, vehicleId);
+    if (activeTrips.length > 0) {
+        if (status === VehicleStatus.MAINTENANCE || status === VehicleStatus.INACTIVE) {
+            throw new AppError(
+                `Xe đang được gán cho chuyến ${activeTrips[0].trip_code}. Không thể chuyển sang trạng thái bảo dưỡng hoặc ngừng hoạt động.`,
+                400,
+            );
+        }
     }
 
     vehicle.status = status;
@@ -140,10 +170,7 @@ export const deleteVehicle = async (agencyId: string, vehicleId: string) => {
 
     if (!vehicle) throw new AppError('Không tìm thấy phương tiện', 404);
 
-    // Đang chạy thì không được xóa
-    if (vehicle.status === VehicleStatus.IN_SERVICE) {
-        throw new AppError('Không thể xóa xe đang ở trạng thái "Đang chạy"!', 400);
-    }
+    await assertVehicleHasNoActiveTrips(agencyId, vehicleId, 'Không thể ẩn phương tiện.');
 
     await vehicleRepo.softDelete(vehicleId);
     return true;

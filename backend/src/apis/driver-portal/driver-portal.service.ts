@@ -6,6 +6,7 @@ import { TripCheckin } from '../../entities/trip-checkin.entity';
 import { CheckinResult, TripStatus } from '../../common/constants/enums';
 import { vnMonthRangeFromYearMonth } from '../../common/utils/vn-timezone';
 import { AppError, BadRequestException } from '../../common/errors/app-error';
+import { syncVehicleStatusFromActiveTrips } from '../vehicles/vehicle-trip-sync';
 import type {
     DriverViolationsQuery,
     GetMyTripsQuery,
@@ -384,6 +385,7 @@ const checkinTripImpl = async (
                     result: CheckinResult.SUCCESS,
                 }),
             );
+            await syncVehicleStatusFromActiveTrips(trip.agency_id, trip.vehicle_id, manager);
         });
         const updated = await tripRepo.findOne({
             where: { id: tripId },

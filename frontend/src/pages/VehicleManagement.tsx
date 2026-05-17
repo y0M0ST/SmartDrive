@@ -157,8 +157,12 @@ export default function VehicleManagement() {
       setVehicleToDelete(null);
     } catch (error: unknown) {
       const msg = getApiMessage(error);
-      if (vehicleToDelete.status === "IN_SERVICE" || msg.toLowerCase().includes("đang chạy")) {
-        toast.error("Không thể xóa xe đang ở trạng thái Đang chạy.");
+      if (
+        vehicleToDelete.status === "IN_SERVICE" ||
+        msg.toLowerCase().includes("đang chạy") ||
+        msg.toLowerCase().includes("đang được gán cho chuyến")
+      ) {
+        toast.error(msg || "Không thể ẩn xe đang gán chuyến đi.");
       } else {
         toast.error(msg);
       }
@@ -424,9 +428,10 @@ export default function VehicleManagement() {
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={() => void handleConfirmDelete()}
-        title="Xóa xe"
-        message="Bạn có chắc chắn muốn xóa xe mang biển số"
+        title="Ẩn phương tiện"
+        message="Bạn có chắc muốn ẩn xe"
         itemName={vehicleToDelete?.license_plate || ""}
+        suffix="Ẩn khỏi danh sách, giữ lịch sử chuyến."
       />
     </div>
   );
