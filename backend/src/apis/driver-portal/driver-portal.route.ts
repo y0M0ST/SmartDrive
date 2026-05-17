@@ -8,6 +8,7 @@ import {
     getMyTripsQuerySchema,
     saveFaceTemplateBodySchema,
     tripCheckinSchema,
+    completeTripSchema,
 } from './driver-portal.dto';
 
 const router = Router();
@@ -357,6 +358,35 @@ router.post(
     '/me/trips/:tripId/checkin',
     validate(tripCheckinSchema),
     driverPortalController.checkinTrip,
+);
+
+/**
+ * @swagger
+ * /api/driver/me/trips/{tripId}/complete:
+ *   post:
+ *     summary: Kết thúc chuyến đi (tài xế)
+ *     tags: [Driver Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tripId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Chuyến chuyển sang COMPLETED
+ *       400:
+ *         description: Chuyến không ở IN_PROGRESS
+ *       404:
+ *         description: Không tìm thấy chuyến
+ */
+router.post(
+    '/me/trips/:tripId/complete',
+    validate(completeTripSchema),
+    driverPortalController.completeTrip,
 );
 
 export default router;

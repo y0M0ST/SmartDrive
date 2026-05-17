@@ -28,10 +28,10 @@ import { driverApi, unwrapFaceTemplate } from "@/services/driverApi";
 /**
  * Máy yếu: interval quá ngắn → các lần detect chồng chéo, UI tắc. 300–350ms thường ổn định hơn 220ms.
  */
-const SCAN_INTERVAL_MS = 320;
+const SCAN_INTERVAL_MS = 500;
 const FACE_ENCODING_DIM = 128;
-/** Bước 2 (khớp mẫu): 1 khung đạt ngưỡng là gọi API ngay. Đăng ký vẫn cần ≥2 tick (anchor + xác nhận). */
-const REQUIRED_STREAK = 1;
+/** Bước 2 (khớp mẫu): 3 khung liên tiếp đạt ngưỡng (US_18). */
+const REQUIRED_STREAK = 3;
 const MAX_MISMATCH_BEFORE_LOCK = 5;
 
 /** Không hoàn thành bước 1 (nhìn thẳng ổn định) trong thời gian này → thoát / timeout. */

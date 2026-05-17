@@ -114,4 +114,8 @@ export const driverApi = {
       | { result: "SUCCESS"; matchScore: number; faceEncoding: number[] }
       | { result: "FAILED" | "LOCKED"; matchScore: number },
   ) => api.post(`/driver/me/trips/${tripId}/checkin`, body, { headers: bearerHeaders() }),
+
+  /** Kết thúc chuyến IN_PROGRESS — chuyển COMPLETED và trả xe về AVAILABLE (nếu không còn chuyến active). */
+  completeTrip: (tripId: string) =>
+    api.post(`/driver/me/trips/${tripId}/complete`, {}, { headers: bearerHeaders() }),
 };
