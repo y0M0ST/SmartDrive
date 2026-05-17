@@ -33,6 +33,18 @@ export type AiViolationSocketPayload = {
     longitude: number | null;
 };
 
+const logRoomEmit = (event: string, room: string): void => {
+    if (!io) return;
+    const size = io.sockets.adapter.rooms.get(room)?.size ?? 0;
+    if (size === 0) {
+        console.warn(
+            `[Socket.io] emit ${event} -> ${room} nhung khong co client nao trong phong (admin chua ket noi socket hoac sai instance Render).`,
+        );
+    } else {
+        console.log(`[Socket.io] emit ${event} -> ${room} (${size} client(s))`);
+    }
+};
+
 /**
  * US_09 — Chỉ phòng `agency_room:{agency_id}` nhận cập nhật (không broadcast toàn cục).
  */
@@ -46,6 +58,7 @@ export const emitTripGpsUpdateToAgencyRoom = (
     const room = buildAgencyRoomId(agencyId);
     try {
         io.to(room).emit('trip_gps_update', payload);
+        logRoomEmit('trip_gps_update', room);
     } catch (err) {
         console.warn('[Socket.io] emit trip_gps_update that bai:', err);
     }
@@ -59,11 +72,15 @@ export const emitAiViolationAlertToAgencyRoom = (
     payload: AiViolationSocketPayload,
 ): void => {
     if (!agencyId || !io) {
+        if (!io) {
+            console.warn('[Socket.io] emit ai_violation_alert bo qua: Socket.io chua khoi tao.');
+        }
         return;
     }
     const room = buildAgencyRoomId(agencyId);
     try {
         io.to(room).emit('ai_violation_alert', payload);
+        logRoomEmit('ai_violation_alert', room);
     } catch (err) {
         console.warn('[Socket.io] emit ai_violation_alert that bai:', err);
     }
