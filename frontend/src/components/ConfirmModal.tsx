@@ -10,6 +10,8 @@ interface ConfirmModalProps {
   itemName?: string; // Tên của đối tượng đang muốn xóa (VD: "Tài xế Nguyễn Văn A")
   /** Thay cho câu "Hành động này không thể hoàn tác." (VD: xóa mềm xe) */
   suffix?: string;
+  /** Nhãn nút xác nhận (mặc định: Đồng ý xóa) */
+  confirmLabel?: string;
 }
 
 const ConfirmModal = ({ 
@@ -20,11 +22,12 @@ const ConfirmModal = ({
   message = "Bạn có chắc chắn muốn xóa",
   itemName = "dữ liệu này",
   suffix = "Hành động này không thể hoàn tác.",
+  confirmLabel = "Đồng ý xóa",
 }: ConfirmModalProps): ReactElement | null => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[400px] max-w-[95%] overflow-hidden animate-fade-in-up p-6">
         
         {/* Phần Icon cảnh báo & Nội dung */}
@@ -57,7 +60,7 @@ const ConfirmModal = ({
             onClick={onConfirm} 
             className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 shadow-sm shadow-red-600/30 transition-all active:scale-95"
           >
-            Đồng ý xóa
+            {confirmLabel}
           </button>
         </div>
         

@@ -85,6 +85,12 @@ export default function DriverSchedulePage() {
   const upcoming = useMemo(() => sortUpcomingTrips(trips.filter(isUpcoming)), [trips]);
   const history = useMemo(() => trips.filter(isHistory), [trips]);
 
+  const activeInProgressTrip = useMemo(
+    () => trips.find((t) => t.status === "IN_PROGRESS") ?? null,
+    [trips],
+  );
+  const hasActiveInProgressTrip = activeInProgressTrip != null;
+
   const loadTrips = useCallback(async () => {
     setLoading(true);
     try {
@@ -182,16 +188,25 @@ export default function DriverSchedulePage() {
         toast.error("Điểm danh khuôn mặt đang bị khóa. Vui lòng liên hệ nhà xe để được mở khóa.");
         return;
       }
+      if (hasActiveInProgressTrip) {
+        toast.error(
+          `Chuyến ${activeInProgressTrip?.trip_code || "đang chạy"} chưa kết thúc. Vui lòng kết thúc chuyến cũ trước khi bắt đầu chuyến mới.`,
+          { duration: 8000 },
+        );
+        return;
+      }
       setDetailOpen(false);
       setDetailTrip(null);
       setFaceScannerMode("checkin");
       setFaceScannerTripId(trip.id);
       setFaceScannerOpen(true);
     },
-    [faceCheckinLocked],
+    [faceCheckinLocked, hasActiveInProgressTrip, activeInProgressTrip?.trip_code],
   );
 
   const handleRequestCompleteTrip = useCallback((trip: DriverPortalTrip) => {
+    setDetailOpen(false);
+    setDetailTrip(null);
     setTripToComplete(trip);
     setCompleteConfirmOpen(true);
   }, []);
@@ -322,6 +337,8 @@ export default function DriverSchedulePage() {
         resolveProvinceName={resolveProvinceName}
         hasFaceTemplate={hasFaceTemplate}
         faceCheckinLocked={faceCheckinLocked}
+        hasActiveInProgressTrip={hasActiveInProgressTrip}
+        activeInProgressTripCode={activeInProgressTrip?.trip_code}
         onRegisterFace={handleRegisterFaceFromDialog}
         onStartTrip={handleStartTripFromDialog}
         onCompleteTrip={handleRequestCompleteTrip}
@@ -339,6 +356,7 @@ export default function DriverSchedulePage() {
         message="Bạn có chắc chắn muốn kết thúc hành trình này không"
         itemName=""
         suffix="Hành động này không thể hoàn tác."
+        confirmLabel="Xác nhận kết thúc"
       />
 
       <FaceScannerModal
