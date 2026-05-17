@@ -13,6 +13,7 @@ const createMailerTransport = () => {
   return nodemailer.createTransport({
     host: process.env.MAIL_HOST,
     port,
+    family: 4,
     secure,
     auth: {
       user: process.env.MAIL_USER,
@@ -23,7 +24,7 @@ const createMailerTransport = () => {
     tls: {
       rejectUnauthorized: false,
     },
-  });
+  } as Parameters<typeof nodemailer.createTransport>[0]);
 };
 
 export const sendResetPasswordEmail = async (toEmail: string, fullName: string, resetLink: string) => {
