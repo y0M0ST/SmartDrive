@@ -354,6 +354,15 @@ const checkinTripImpl = async (
     const { result, matchScore } = body;
 
     if (result === CheckinResult.SUCCESS) {
+        const runningTrip = await tripRepo.findOne({
+            where: { driver_id: driverUserId, status: TripStatus.IN_PROGRESS },
+        });
+        if (runningTrip) {
+            throw new BadRequestException(
+                'Bạn đang có chuyến đang chạy chưa kết thúc. Vui lòng kết thúc chuyến cũ trước khi bắt đầu chuyến mới.',
+            );
+        }
+
         const storedEncoding = parseStoredFaceEncoding(profile.face_encoding);
         if (!storedEncoding) {
             throw new BadRequestException('Bạn chưa đăng ký mẫu khuôn mặt — không thể điểm danh bằng Face ID.');

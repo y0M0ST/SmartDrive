@@ -21,6 +21,10 @@ type DriverTripDetailDialogProps = {
   hasFaceTemplate: boolean | null;
   /** Điểm danh Face ID bị khóa (US_18). */
   faceCheckinLocked: boolean;
+  /** Tài xế đang có ít nhất một chuyến IN_PROGRESS (chưa kết thúc). */
+  hasActiveInProgressTrip: boolean;
+  /** Mã chuyến đang chạy — hiển thị trong gợi ý UX. */
+  activeInProgressTripCode?: string | null;
   onRegisterFace: () => void;
   onStartTrip: (trip: DriverPortalTrip) => void;
   onCompleteTrip: (trip: DriverPortalTrip) => void;
@@ -52,6 +56,8 @@ export function DriverTripDetailDialog({
   resolveProvinceName,
   hasFaceTemplate,
   faceCheckinLocked,
+  hasActiveInProgressTrip,
+  activeInProgressTripCode,
   onRegisterFace,
   onStartTrip,
   onCompleteTrip,
@@ -68,6 +74,17 @@ export function DriverTripDetailDialog({
       ? `${resolveProvinceName(startPoint)} → ${resolveProvinceName(endPoint)}`
       : "Chưa cập nhật";
   const callHref = telHref(trip.agency?.phone);
+
+  const startBlockedByRunningTrip = hasActiveInProgressTrip && trip.status === "SCHEDULED";
+  const startTripDisabled =
+    hasFaceTemplate !== true || faceCheckinLocked || startBlockedByRunningTrip;
+  const startTripTitle = faceCheckinLocked
+    ? "Điểm danh khuôn mặt đang bị khóa. Liên hệ nhà xe để mở khóa."
+    : hasFaceTemplate !== true
+      ? "Vui lòng đăng ký khuôn mặt trước khi bắt đầu chuyến."
+      : startBlockedByRunningTrip
+        ? `Chuyến ${activeInProgressTripCode || "đang chạy"} chưa kết thúc. Hãy bấm "Kết thúc chuyến đi" trước khi bắt đầu chuyến mới.`
+        : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,22 +181,27 @@ export function DriverTripDetailDialog({
             ) : null}
 
             {trip.status === "SCHEDULED" ? (
-              <Button
-                type="button"
-                className="w-full gap-2"
-                disabled={hasFaceTemplate !== true || faceCheckinLocked}
-                onClick={() => onStartTrip(trip)}
-                title={
-                  faceCheckinLocked
-                    ? "Điểm danh khuôn mặt đang bị khóa. Liên hệ nhà xe để mở khóa."
-                    : hasFaceTemplate !== true
-                      ? "Vui lòng đăng ký khuôn mặt trước khi bắt đầu chuyến."
-                      : undefined
-                }
-              >
-                <Play className="size-4" aria-hidden />
-                Bắt đầu chuyến đi
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  className="w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  variant={startBlockedByRunningTrip ? "secondary" : "default"}
+                  disabled={startTripDisabled}
+                  onClick={() => onStartTrip(trip)}
+                  title={startTripTitle}
+                >
+                  <Play className="size-4" aria-hidden />
+                  Bắt đầu chuyến đi
+                </Button>
+                {startBlockedByRunningTrip ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                    Bạn đang có chuyến{" "}
+                    <span className="font-mono font-semibold">{activeInProgressTripCode || "đang chạy"}</span> chưa
+                    kết thúc. Mở chuyến đó và bấm{" "}
+                    <span className="font-semibold">Kết thúc chuyến đi</span> trước khi bắt đầu chuyến mới.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
 
             {trip.status === "IN_PROGRESS" ? (
