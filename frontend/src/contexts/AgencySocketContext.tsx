@@ -121,8 +121,33 @@ export function AgencySocketProvider({ children }: { children: ReactNode }) {
     const socket = io(origin, {
       auth: { token: authToken },
       transports: ["websocket", "polling"],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 15,
+      reconnectionDelay: 1000,
+      timeout: 20_000,
     });
     socketRef.current = socket;
+
+    const onConnect = () => {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug("[socket] connected", { origin, id: socket.id });
+      }
+    };
+    const onConnectError = (err: Error) => {
+      // eslint-disable-next-line no-console
+      console.warn("[socket] connect_error", err.message, { origin });
+    };
+    const onDisconnect = (reason: string) => {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.debug("[socket] disconnect", reason);
+      }
+    };
+    socket.on("connect", onConnect);
+    socket.on("connect_error", onConnectError);
+    socket.on("disconnect", onDisconnect);
 
     const onAlert = (raw: unknown) => {
       if (!isAiViolationAlertPayload(raw)) return;
@@ -155,6 +180,9 @@ export function AgencySocketProvider({ children }: { children: ReactNode }) {
     socket.on("trip_gps_update", onTripGps);
 
     return () => {
+      socket.off("connect", onConnect);
+      socket.off("connect_error", onConnectError);
+      socket.off("disconnect", onDisconnect);
       socket.off("ai_violation_alert", onAlert);
       socket.off("trip_gps_update", onTripGps);
       socket.disconnect();

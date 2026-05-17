@@ -13,19 +13,26 @@ import {
 } from './middleware/error-handler.middleware';
 import { setSocketIo } from './socket/socket-hub';
 import { registerAgencySocketIo } from './socket/agency-socket';
+import {
+    buildCorsOptions,
+    buildSocketIoCorsOptions,
+    parseCorsOrigins,
+} from './config/cors-origins';
 
 const port = process.env.PORT || 3000;
 const app = express();
 
-/** Đồng bộ với Socket.io — danh sách origin từ `FRONTEND_URL` (phân tách bằng dấu phẩy). */
-const corsOrigins = process.env.FRONTEND_URL?.split(',').map((s) => s.trim()).filter(Boolean);
+const corsOrigins = parseCorsOrigins();
 
-app.use(
-    cors({
-        origin: corsOrigins?.length ? corsOrigins : true,
-        credentials: true,
-    }),
-);
+if (process.env.NODE_ENV === 'production' && corsOrigins.length === 0) {
+    console.warn(
+        '[CORS] FRONTEND_URL chua cau hinh — Socket.io va REST co the tu choi origin Vercel. Dat VD: https://your-app.vercel.app',
+    );
+} else if (corsOrigins.length > 0) {
+    console.log('[CORS] Allowed origins:', corsOrigins.join(', '));
+}
+
+app.use(cors(buildCorsOptions(corsOrigins)));
 app.use(express.json());
 app.use(morgan('dev'));
 app.use('/api', apiRoutes);
@@ -36,10 +43,11 @@ app.use(globalErrorHandler);
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
-    cors: {
-        origin: corsOrigins?.length ? corsOrigins : true,
-        credentials: true,
-    },
+    cors: buildSocketIoCorsOptions(corsOrigins),
+    allowEIO3: true,
+    pingTimeout: 60_000,
+    pingInterval: 25_000,
+    transports: ['websocket', 'polling'],
 });
 setSocketIo(io);
 registerAgencySocketIo(io);
