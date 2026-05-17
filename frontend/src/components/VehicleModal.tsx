@@ -262,6 +262,7 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
                 onChange={handleInputChange}
                 error={errors.licensePlate}
                 placeholder="VD: 51B-12345"
+                disabled={mode === "edit" && formData.status === "IN_SERVICE"}
               />
 
               <FormSelect
@@ -292,11 +293,13 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
                 name="status"
                 value={formData.status}
                 onChange={handleSelectChange}
-                disabled={mode === "add"}
-                options={(Object.keys(STATUS_LABELS) as VehicleStatusCode[]).map((code) => ({
-                  label: STATUS_LABELS[code],
-                  value: code,
-                }))}
+                disabled={mode === "add" || formData.status === "IN_SERVICE"}
+                options={(Object.keys(STATUS_LABELS) as VehicleStatusCode[])
+                  .filter((code) => code !== "IN_SERVICE" || formData.status === "IN_SERVICE")
+                  .map((code) => ({
+                    label: STATUS_LABELS[code],
+                    value: code,
+                  }))}
               />
 
               <FormInput
@@ -305,6 +308,7 @@ export default function VehicleModal({ isOpen, onClose, mode, initialData, onCon
                 value={formData.aiCameraId}
                 onChange={handleInputChange}
                 placeholder="VD: CAM-0009 — để trống nếu chưa gắn"
+                disabled={mode === "edit" && formData.status === "IN_SERVICE"}
               />
             </div>
 

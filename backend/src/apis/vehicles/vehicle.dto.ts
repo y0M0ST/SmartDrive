@@ -10,6 +10,13 @@ const vehicleStatusOptions = [
     VehicleStatus.MAINTENANCE,
     VehicleStatus.INACTIVE,
 ] as const;
+
+/** Admin chỉ được đặt tay — IN_SERVICE do hệ thống đồng bộ từ chuyến IN_PROGRESS */
+const adminSettableVehicleStatusOptions = [
+    VehicleStatus.AVAILABLE,
+    VehicleStatus.MAINTENANCE,
+    VehicleStatus.INACTIVE,
+] as const;
 const vehicleTypeOptions = [VehicleType.SEAT, VehicleType.SLEEPER] as const;
 const uuidParamSchema = z.object({
     params: z.object({
@@ -41,7 +48,9 @@ export const updateVehicleSchema = z.object({
 
 export const changeVehicleStatusSchema = z.object({
     body: z.object({
-        status: z.enum(vehicleStatusOptions),
+        status: z.enum(adminSettableVehicleStatusOptions, {
+            message: 'Trạng thái không hợp lệ hoặc không được phép đặt tay (IN_SERVICE).',
+        }),
     })
 });
 

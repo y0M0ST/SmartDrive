@@ -193,6 +193,9 @@ export const createTrip = async (createTripDto: CreateTripInput, agencyId: strin
     if (vehicle.status === VehicleStatus.INACTIVE) {
         throw new BadRequestException('Xe không khả dụng (ngừng hoạt động), không thể xếp chuyến.');
     }
+    if (vehicle.status === VehicleStatus.IN_SERVICE) {
+        throw new BadRequestException('Xe đang chạy chuyến, không thể xếp chuyến mới.');
+    }
 
     const driver = await userRepo.findOne({
         where: { id: createTripDto.driver_id, agency_id: agencyId },
