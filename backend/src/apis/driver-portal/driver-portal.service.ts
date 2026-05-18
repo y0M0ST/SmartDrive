@@ -282,11 +282,19 @@ const parseStoredFaceEncoding = (raw: string | null | undefined): number[] | nul
     }
 };
 
+const DRIVER_PROFILE_NOT_FOUND_MESSAGE =
+    'Bạn chưa có hồ sơ tài xế trong hệ thống. Vui lòng liên hệ quản lý nhà xe của bạn để được tạo hồ sơ trước khi đăng ký khuôn mặt và điểm danh.';
+
 const saveFaceTemplateImpl = async (driverUserId: string, body: SaveFaceTemplateBody) => {
     const profileRepo = AppDataSource.getRepository(DriverProfile);
     const profile = await profileRepo.findOne({ where: { user_id: driverUserId } });
     if (!profile) {
-        throw new AppError('Không tìm thấy hồ sơ tài xế.', 404);
+        throw new AppError(
+            DRIVER_PROFILE_NOT_FOUND_MESSAGE,
+            404,
+            undefined,
+            'DRIVER_PROFILE_NOT_FOUND',
+        );
     }
     if (profile.is_locked) {
         throw new AppError(
@@ -305,11 +313,21 @@ const getFaceTemplateImpl = async (driverUserId: string) => {
     const profileRepo = AppDataSource.getRepository(DriverProfile);
     const profile = await profileRepo.findOne({ where: { user_id: driverUserId } });
     if (!profile) {
-        throw new AppError('Không tìm thấy hồ sơ tài xế.', 404);
+        throw new AppError(
+            DRIVER_PROFILE_NOT_FOUND_MESSAGE,
+            404,
+            undefined,
+            'DRIVER_PROFILE_NOT_FOUND',
+        );
     }
     const parsed = parseStoredFaceEncoding(profile.face_encoding);
     if (!parsed) {
-        throw new AppError('Bạn chưa đăng ký mẫu khuôn mặt.', 404);
+        throw new AppError(
+            'Bạn chưa đăng ký mẫu khuôn mặt. Vui lòng hoàn tất đăng ký khuôn mặt trước khi bắt đầu chuyến.',
+            404,
+            undefined,
+            'FACE_TEMPLATE_NOT_REGISTERED',
+        );
     }
     return { faceEncoding: parsed, is_locked: !!profile.is_locked };
 };
@@ -334,7 +352,12 @@ const checkinTripImpl = async (
 
     const profile = await profileRepo.findOne({ where: { user_id: driverUserId } });
     if (!profile) {
-        throw new AppError('Không tìm thấy hồ sơ tài xế.', 404);
+        throw new AppError(
+            DRIVER_PROFILE_NOT_FOUND_MESSAGE,
+            404,
+            undefined,
+            'DRIVER_PROFILE_NOT_FOUND',
+        );
     }
     if (profile.is_locked) {
         throw new AppError(
