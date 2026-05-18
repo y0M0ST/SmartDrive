@@ -4,6 +4,12 @@ import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { driverApi, unwrapDriverMyTrips, unwrapFaceTemplate } from "@/services/driverApi";
+import {
+  FACE_TEMPLATE_NOT_REGISTERED_CODE,
+  isDriverProfileNotFoundError,
+  NO_DRIVER_PROFILE_MESSAGE,
+  parseDriverFaceApiError,
+} from "@/lib/faceApiErrors";
 import { provinceApi, type VietnamProvinceDto } from "@/services/provinceApi";
 import type { DriverPortalTrip } from "@/types/driverPortal";
 import { DriverTripCard } from "@/components/driver-portal/DriverTripCard";
@@ -62,6 +68,8 @@ export default function DriverSchedulePage() {
   const [detailOpen, setDetailOpen] = useState(false);
   /** `null` = đang kiểm tra hoặc lỗi mạng (không phân biệt được). */
   const [hasFaceTemplate, setHasFaceTemplate] = useState<boolean | null>(null);
+  /** `false` = chưa có `driver_profiles` trên BE. */
+  const [hasDriverProfile, setHasDriverProfile] = useState<boolean | null>(null);
   /** Điểm danh Face ID bị khóa (US_18) — từ GET mẫu khuôn mặt. */
   const [faceCheckinLocked, setFaceCheckinLocked] = useState(false);
   const [faceScannerOpen, setFaceScannerOpen] = useState(false);
@@ -114,21 +122,31 @@ export default function DriverSchedulePage() {
       const res = await driverApi.getFaceTemplate();
       const parsed = unwrapFaceTemplate(res);
       if (parsed) {
+        setHasDriverProfile(true);
         setHasFaceTemplate(true);
         setFaceCheckinLocked(!!parsed.is_locked);
       } else {
+        setHasDriverProfile(null);
         setHasFaceTemplate(null);
         setFaceCheckinLocked(false);
       }
     } catch (e: unknown) {
-      const status = (e as { response?: { status?: number } })?.response?.status;
-      if (status === 404) {
+      if (isDriverProfileNotFoundError(e)) {
+        setHasDriverProfile(false);
         setHasFaceTemplate(false);
         setFaceCheckinLocked(false);
-      } else {
-        setHasFaceTemplate(null);
-        setFaceCheckinLocked(false);
+        return;
       }
+      const parsed = parseDriverFaceApiError(e);
+      if (parsed.status === 404 && parsed.errorCode === FACE_TEMPLATE_NOT_REGISTERED_CODE) {
+        setHasDriverProfile(true);
+        setHasFaceTemplate(false);
+        setFaceCheckinLocked(false);
+        return;
+      }
+      setHasDriverProfile(null);
+      setHasFaceTemplate(null);
+      setFaceCheckinLocked(false);
     }
   }, []);
 
@@ -259,7 +277,28 @@ export default function DriverSchedulePage() {
         </div>
       ) : null}
 
-      {hasFaceTemplate === false && !faceCheckinLocked ? (
+      {hasDriverProfile === false && !faceCheckinLocked ? (
+        <div
+          className={cn(
+            "flex flex-col gap-3 rounded-xl border border-sky-200/90 bg-sky-50/95 p-4 shadow-sm",
+            "dark:border-sky-900/50 dark:bg-sky-950/40",
+          )}
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">Chưa có hồ sơ tài xế</p>
+            <p className="mt-1 text-xs leading-relaxed text-sky-900/90 dark:text-sky-200/90">{NO_DRIVER_PROFILE_MESSAGE}</p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full shrink-0 gap-2 border-sky-300/80 bg-white/90 text-sky-950 hover:bg-white dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-50"
+            onClick={openFaceRegister}
+          >
+            <Camera className="size-4" aria-hidden />
+            Thử quét camera
+          </Button>
+        </div>
+      ) : hasFaceTemplate === false && hasDriverProfile !== false && !faceCheckinLocked ? (
         <div
           className={cn(
             "flex flex-col gap-3 rounded-xl border border-amber-200/90 bg-amber-50/95 p-4 shadow-sm",
@@ -336,6 +375,7 @@ export default function DriverSchedulePage() {
         trip={detailTrip}
         resolveProvinceName={resolveProvinceName}
         hasFaceTemplate={hasFaceTemplate}
+        hasDriverProfile={hasDriverProfile}
         faceCheckinLocked={faceCheckinLocked}
         hasActiveInProgressTrip={hasActiveInProgressTrip}
         activeInProgressTripCode={activeInProgressTrip?.trip_code}

@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { DriverPortalTrip } from "@/types/driverPortal";
+import { NO_DRIVER_PROFILE_MESSAGE } from "@/lib/faceApiErrors";
 import type { TripStatusCode } from "@/types/trip";
 import { tripStatusBadgeCnForDriver, tripStatusLabel } from "@/lib/tripStatusDisplay";
 import { vehicleStatusLabel, vehicleTypeLabel } from "@/lib/vehicleDisplay";
@@ -19,6 +20,8 @@ type DriverTripDetailDialogProps = {
   resolveProvinceName: (code: string) => string;
   /** `null` = đang kiểm tra với BE. */
   hasFaceTemplate: boolean | null;
+  /** `false` = chưa có hồ sơ tài xế trên hệ thống. */
+  hasDriverProfile: boolean | null;
   /** Điểm danh Face ID bị khóa (US_18). */
   faceCheckinLocked: boolean;
   /** Tài xế đang có ít nhất một chuyến IN_PROGRESS (chưa kết thúc). */
@@ -55,6 +58,7 @@ export function DriverTripDetailDialog({
   trip,
   resolveProvinceName,
   hasFaceTemplate,
+  hasDriverProfile,
   faceCheckinLocked,
   hasActiveInProgressTrip,
   activeInProgressTripCode,
@@ -77,10 +81,15 @@ export function DriverTripDetailDialog({
 
   const startBlockedByRunningTrip = hasActiveInProgressTrip && trip.status === "SCHEDULED";
   const startTripDisabled =
-    hasFaceTemplate !== true || faceCheckinLocked || startBlockedByRunningTrip;
+    hasDriverProfile === false ||
+    hasFaceTemplate !== true ||
+    faceCheckinLocked ||
+    startBlockedByRunningTrip;
   const startTripTitle = faceCheckinLocked
     ? "Điểm danh khuôn mặt đang bị khóa. Liên hệ nhà xe để mở khóa."
-    : hasFaceTemplate !== true
+    : hasDriverProfile === false
+      ? NO_DRIVER_PROFILE_MESSAGE
+      : hasFaceTemplate !== true
       ? "Vui lòng đăng ký khuôn mặt trước khi bắt đầu chuyến."
       : startBlockedByRunningTrip
         ? `Chuyến ${activeInProgressTripCode || "đang chạy"} chưa kết thúc. Hãy bấm "Kết thúc chuyến đi" trước khi bắt đầu chuyến mới.`
@@ -173,7 +182,17 @@ export function DriverTripDetailDialog({
           ) : null}
 
           <div className="flex flex-col gap-2">
-            {hasFaceTemplate === false && !faceCheckinLocked ? (
+            {hasDriverProfile === false && !faceCheckinLocked ? (
+              <>
+                <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-relaxed text-sky-950 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100">
+                  {NO_DRIVER_PROFILE_MESSAGE}
+                </p>
+                <Button type="button" className="w-full gap-2" variant="secondary" onClick={onRegisterFace}>
+                  <Camera className="size-4" aria-hidden />
+                  Thử quét camera
+                </Button>
+              </>
+            ) : hasFaceTemplate === false && hasDriverProfile !== false && !faceCheckinLocked ? (
               <Button type="button" className="w-full gap-2" variant="secondary" onClick={onRegisterFace}>
                 <Camera className="size-4" aria-hidden />
                 Đăng ký khuôn mặt

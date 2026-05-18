@@ -24,6 +24,12 @@ import {
   type FaceDescriptorSnapshot,
 } from "@/lib/ai/faceAuth";
 import { driverApi, unwrapFaceTemplate } from "@/services/driverApi";
+import {
+  FACE_TEMPLATE_NOT_REGISTERED_CODE,
+  isDriverProfileNotFoundError,
+  NO_DRIVER_PROFILE_MESSAGE,
+  parseDriverFaceApiError,
+} from "@/lib/faceApiErrors";
 
 /**
  * Máy yếu: interval quá ngắn → các lần detect chồng chéo, UI tắc. 300–350ms thường ổn định hơn 220ms.
@@ -137,6 +143,9 @@ export function FaceScannerModal({
   const [livenessRemainingSec, setLivenessRemainingSec] = useState(LIVENESS_TIMEOUT_SEC);
   /** Gợi ý dưới video khi bước 1: không thấy mặt / chưa đủ động tác / đang giữ chuỗi. */
   const [liveStep1Hint, setLiveStep1Hint] = useState<string>("");
+  /** Chưa có `driver_profiles` — vẫn cho quét thử nhưng không lưu được mẫu. */
+  const [noDriverProfile, setNoDriverProfile] = useState(false);
+  const noDriverProfileRef = useRef(false);
 
   const stopInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -186,6 +195,8 @@ export function FaceScannerModal({
       setPhase("idle");
       setStatusLine("");
       setLockMessage(LOCKED_UI_FALLBACK);
+      setNoDriverProfile(false);
+      noDriverProfileRef.current = false;
       return;
     }
 
@@ -405,6 +416,12 @@ export function FaceScannerModal({
         setStreakUi(streakRef.current);
         if (streakRef.current >= REQUIRED_STREAK) {
           stopInterval();
+          if (noDriverProfileRef.current) {
+            setPhase("error");
+            setStatusLine(NO_DRIVER_PROFILE_MESSAGE);
+            toast.error(NO_DRIVER_PROFILE_MESSAGE, { duration: 12_000 });
+            return;
+          }
           setPhase("submitting");
           setStatusLine("Đang lưu mẫu khuôn mặt…");
           const encoding = Array.from(snap.descriptor);
@@ -414,13 +431,24 @@ export function FaceScannerModal({
             cleanupCapture();
             onCompleteRef.current();
             onOpenChangeRef.current(false);
-          } catch {
-            toast.error("Không lưu được mẫu. Thử lại.");
+          } catch (saveErr: unknown) {
+            if (isDriverProfileNotFoundError(saveErr)) {
+              stopInterval();
+              cleanupCapture();
+              noDriverProfileRef.current = true;
+              setNoDriverProfile(true);
+              setPhase("error");
+              setStatusLine(NO_DRIVER_PROFILE_MESSAGE);
+              toast.error(NO_DRIVER_PROFILE_MESSAGE, { duration: 12_000 });
+              return;
+            }
+            const parsed = parseDriverFaceApiError(saveErr);
+            toast.error(parsed.message || "Không lưu được mẫu. Thử lại.", { duration: 8000 });
             streakRef.current = 0;
             setStreakUi(0);
             anchorRef.current = null;
             setPhase("scanning");
-            setStatusLine("Lỗi khi gửi máy chủ. Tiếp tục quét…");
+            setStatusLine(parsed.message || "Lỗi khi gửi máy chủ. Tiếp tục quét…");
             startScanLoop();
           }
         }
@@ -437,6 +465,17 @@ export function FaceScannerModal({
       try {
         await loadFaceModels();
         if (cancelled) return;
+
+        if (mode === "register") {
+          try {
+            await driverApi.getFaceTemplate();
+          } catch (probeErr: unknown) {
+            if (isDriverProfileNotFoundError(probeErr)) {
+              noDriverProfileRef.current = true;
+              setNoDriverProfile(true);
+            }
+          }
+        }
 
         if (mode === "checkin") {
           if (!tripId) {
@@ -469,13 +508,21 @@ export function FaceScannerModal({
             // eslint-disable-next-line no-console
             console.log("[Face ID] Đã tải mẫu gốc từ DB (anchor), dim:", enc.length);
           } catch (e: unknown) {
-            const status = (e as { response?: { status?: number } })?.response?.status;
-            if (status === 404) {
+            if (isDriverProfileNotFoundError(e)) {
               setPhase("error");
-              setStatusLine("Bạn chưa đăng ký mẫu khuôn mặt. Vui lòng đăng ký trước khi bắt đầu chuyến.");
+              setStatusLine(NO_DRIVER_PROFILE_MESSAGE);
+              return;
+            }
+            const parsed = parseDriverFaceApiError(e);
+            if (parsed.status === 404 && parsed.errorCode === FACE_TEMPLATE_NOT_REGISTERED_CODE) {
+              setPhase("error");
+              setStatusLine(
+                parsed.message ||
+                  "Bạn chưa đăng ký mẫu khuôn mặt. Vui lòng đăng ký trước khi bắt đầu chuyến.",
+              );
             } else {
               setPhase("error");
-              setStatusLine("Không tải được mẫu khuôn mặt từ máy chủ.");
+              setStatusLine(parsed.message || "Không tải được mẫu khuôn mặt từ máy chủ.");
             }
             return;
           }
@@ -595,6 +642,12 @@ export function FaceScannerModal({
           </div>
         ) : (
           <>
+            {noDriverProfile && mode === "register" ? (
+              <p className="mb-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs leading-relaxed text-sky-950 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100">
+                {NO_DRIVER_PROFILE_MESSAGE} Bạn vẫn có thể quét thử camera; mẫu khuôn mặt chỉ lưu được sau khi
+                quản lý tạo hồ sơ cho bạn.
+              </p>
+            ) : null}
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-black">
               <video
                 ref={videoRef}
