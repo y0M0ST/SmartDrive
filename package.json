@@ -2,8 +2,8 @@
   "name": "smartdrive",
   "private": true,
   "workspaces": [
-    "frontend",
-    "backend"
+    "backend",
+    "frontend"
   ],
   "scripts": {
     "dev:be": "npm run dev --workspace=backend",
